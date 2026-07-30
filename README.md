@@ -22,7 +22,4 @@
 | 嵌入式 | C、STM32 (Keil MDK) |
 | 测试 | 示波器、直流电源、电子负载、LCR 电桥 |
 
-## 联系方式
-
 - GitHub: [@zxlnba](https://github.com/zxlnba)
-- Email: zjj2011jv662@163.com
