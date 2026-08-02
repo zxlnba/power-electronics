@@ -1,6 +1,4 @@
-# Power Electronics Portfolio
-
-华南农业大学电气工程本科生，电力电子与开关电源方向。
+# Power Electronics Portfolio。
 
 ## 项目
 
