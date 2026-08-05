@@ -20,4 +20,8 @@
 | 嵌入式 | C、STM32 (Keil MDK) |
 | 测试 | 示波器、直流电源、电子负载、LCR 电桥 |
 
+### [双路电压采样板 — STM32G474](./voltage-sampling/)
+
+±200V 高压直流电压采样，AMC1350 + TLV9002 隔离采样链路，OLED 实时显示，HRTIM 输出 107kHz LLC 驱动。含 ADC 时钟排障、供电问题定位、校准旋钮说明。
+
 - GitHub: [@zxlnba](https://github.com/zxlnba)
