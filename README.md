@@ -4,13 +4,16 @@
 
 ### [全桥 LLC 谐振变换器](./llc-resonant-converter/)
 
-面向数据中心高压直流供电场景的 20kW 全桥 LLC 谐振变换器设计。含 FHA 参数推导、SiC 器件选型与损耗分析、PLECS 仿真、控制策略及 PCB 设计。
+面向数据中心高压直流供电场景的 20kW 全桥 LLC 谐振变换器。
 
-- **[电压采样板](./voltage-sampling/)** — ±200V 隔离电压采样，AMC1350 + TLV9002 + STM32G474，OLED 实时显示，HRTIM 输出 LLC 驱动
+| 阶段 | 目录 | 内容 |
+|---|---|---|
+| 20kW 纸面设计 | [`20kw-design/`](./llc-resonant-converter/20kw-design/) | FHA 谐振腔设计、SiC 选型与损耗、PLECS 仿真、PCB 设计 |
+| 1kW 原理样机 | [`1kw-prototype/`](./llc-resonant-converter/1kw-prototype/) | 缩比样机原理图、电压采样板、调试验证 |
 
 ### [反激开关电源 — 基于 UC3842](./flyback-uc3842/)
 
-24V/3A (72W) 反激开关电源，从参数计算、变压器绕制到 PCB 设计调试全流程独立完成。含实测效率、纹波、环路数据及故障排查记录。
+24V/3A (72W) 反激开关电源，从参数计算、变压器绕制到 PCB 调试全流程独立完成。含实测效率、纹波、环路数据及故障排查记录。
 
 ## 技能
 
