@@ -233,13 +233,15 @@ E:0             ← ADC 错误码 (0=正常)
 Gvd(s) = K_f·(1+s/ωz_lm) / ((1+s/ωp_out)·(1+s/(ωr·Qr)+s²/ωr²))
 C(z)   = 2p2z，Ts = 1/fr = 9.35µs（每开关周期控制）
 指标：fco ≈ 2kHz，PM ≈ 70°（含 1 拍延迟），GM ≈ 44dB
+      K_f = -0.748 V/kHz（负载无关），2p2z 系数见 llc_controller.h
 ```
 
 详见 [`control-loop/`](./control-loop/)（设计推导 + MATLAB 脚本 + 闭环验证 + PLECS 验证步骤）
 
-> **⚠️ 关键设计发现**：满载下 FHA 增益峰值 M_max = 1.012，360V 输入需 M = 1.111，
-> **满载低输入时无法维持 ±200V**（输出随输入跌落），控制器会饱和到 fs_min。
-> 应对与后续优化见 [`control-loop/README.md`](./control-loop/README.md) §3。
+> **⚠️ 关键设计发现**：满载下 FHA 增益峰值 M_max = 1.011（@fn≈0.95），360V 输入
+> 需 M = 1.111，**满载低输入时无法维持 ±200V**（输出随输入跌落），控制器会饱和到
+> fs_min；轻载受 fs_min 限制可达约 1.04–1.05。应对与后续优化见
+> [`control-loop/README.md`](./control-loop/README.md) §3。
 
 ---
 

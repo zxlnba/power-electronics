@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>从零吃透 LLC 数字电压环 · 1kW 样机互动教学</title>
+<meta name="description" content="用 1kW 全桥 LLC 样机的真实参数，从物理直觉到 Bode 图再到 2p2z 代码，把数字电压环学透。全部图表可交互。">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="topbar">🔌 LLC 数字电压环 · 互动教学</div>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">🔌 LLC 数字电压环</div>
+    <div class="sub">1kW 样机 · 从物理直觉到 2p2z 代码</div>
+    <nav>
+      <a href="#intro" class="active"><span class="num">00</span>怎么用这个网站</a>
+      <a href="#ch1"><span class="num">01</span>物理直觉：旋钮与秋千</a>
+      <a href="#ch2"><span class="num">02</span>把电路翻译成传函</a>
+      <a href="#ch3"><span class="num">03</span>负反馈与稳态误差</a>
+      <a href="#ch4"><span class="num">04</span>Bode 图与稳定性</a>
+      <a href="#ch5"><span class="num">05</span>补偿器设计</a>
+      <a href="#ch6"><span class="num">06</span>数字化：从传函到代码</a>
+      <a href="#ch7"><span class="num">07</span>实战复盘：1kW 全程</a>
+      <a href="#ch8"><span class="num">08</span>答疑：那些"为什么"</a>
+      <a href="#quiz"><span class="num">09</span>练习</a>
+    </nav>
+  </aside>
+
+  <main>
+  <article class="article">
+
+    <!-- ================= 00 序言 ================= -->
+    <section id="intro">
+      <h2>怎么用这个网站</h2>
+      <p class="ch-sub">给学过《自动控制原理》但忘了、也从没真正用过的你</p>
+      <p>你手上有这样一台东西：<strong class="hl">1kW 全桥 LLC 谐振变换器</strong>，输入 360–440V，输出 ±200V。它靠一个 STM32 芯片，用一套叫<em>数字电压环</em>的算法，把输出电压牢牢钉在目标值上——不管输入怎么变、负载怎么变。</p>
+      <p>这套算法，就是你在《自动控制原理》里学过、但当时觉得"跟电路没什么关系"的那套东西：<strong>传函、极点零点、Bode 图、相位裕度、PID</strong>。本网站把它们一个个拆开，全部套在你自己的样机参数上，并且<strong>每个核心概念都配一个能亲手拖参数的交互图</strong>。</p>
+      <div class="callout">
+        <span class="t">📖 建议学习路径</span>
+        按顺序读：01 建立直觉 → 02 建模 → 03–05 控制三件套（反馈/稳定性/补偿器）→ 06 数字化 → 07 用你的样机把全程串一遍 → 08 答疑 → 09 练习。
+        遇到图，先别急着看结论，<strong>亲手拖一拖滑杆</strong>，感受参数变了图怎么变。
+      </div>
+      <p>需要的前置知识：只要懂"增益、相位、负数反馈、频率"这几个词就够了。全部公式都给了物理直觉版，数学只是一个总结。</p>
+    </section>
+
+    <!-- ================= 01 物理直觉 ================= -->
+    <section id="ch1">
+      <h2>第一课 · 物理直觉：旋钮与秋千</h2>
+      <p class="ch-sub">你的 LLC 只有一个旋钮：开关频率 fs</p>
+
+      <h3>1.1 为什么控制"频率"，不是"占空比"</h3>
+      <p>普通开关电源（Buck、Flyback）用 <strong>PWM</strong>：固定频率，调占空比 D 改变输出。你的 LLC 不行——全桥必须保持 50% 占空比，靠的是<strong>谐振腔</strong>把方波变成正弦电流。</p>
+      <p>谐振腔是 Lr（270µH）串 Cr（8.2nF），它像<strong>荡秋千</strong>：</p>
+      <ul>
+        <li>推的节奏正好对（fs = 谐振频率 fr = 107kHz）→ 荡得最欢，电压增益 M ≈ 1</li>
+        <li>推太快（fs &gt; fr）→ 荡不起来，M &lt; 1，输出被压低</li>
+        <li>推慢一点（fs &lt; fr）→ 荡得更高，M &gt; 1，能升压（但有上限 M_max）</li>
+      </ul>
+      <p>所以控制电压 = 调"推秋千的手速" = 调 fs。这种控制方式叫 <strong>PFM</strong>（脉冲频率调制）。</p>
+
+      <div class="callout warn">
+        <span class="t">⚠️ 方向很重要</span>
+        fs 升高 → 增益下降 → <strong>Vout 下降</strong>。也就是说你的"旋钮"是反相的：想让电压上去，频率要往下拧。后面补偿器里的负号就是为了这件事。
+      </div>
+
+      <h3>1.2 亲手试试：增益曲线</h3>
+      <p>下面这条曲线就是"手速 → 荡幅"关系。拖动 <code class="inline">Lm/Lr</code>（励磁电感比，决定升压能力）和负载，看曲线怎么变。</p>
+
+      <div class="interactive" data-int="gain-curve">
+        <span class="int-tag">交互 01 · FHA 增益曲线</span>
+      </div>
+
+      <ul>
+        <li><strong>fn = fs/fr</strong>：横轴是"频率归一化到谐振点"。fn=1 是谐振点，左边降压区（升压），右边升压区（降压）。</li>
+        <li><strong>M_max</strong>：升压的物理上限。看红色标注——满载时只有 1.011，也就是说<em>满负载下想大幅升压是做不到的</em>（第八章详解）。</li>
+        <li>试试把负载切到 25%：曲线峰值明显抬高（1.243）。<strong>负载越轻，越能升压</strong>。</li>
+      </ul>
+
+      <h3>1.3 这一课记住三件事</h3>
+      <ol>
+        <li>旋钮 = 开关频率 fs，范围 95–130kHz，额定在 fr = 107kHz。</li>
+        <li>反相：fs↑ → Vout↓。</li>
+        <li>升压上限 M_max 是物理极限，满载时很小（1.011）。</li>
+      </ol>
+    </section>
+
+    <!-- ================= 02 建模 ================= -->
+    <section id="ch2">
+      <h2>第二课 · 把电路翻译成传函</h2>
+      <p class="ch-sub">被控对象 Gvd(s)：输入 fs，输出 Vout</p>
+
+      <h3>2.1 从一个"旋钮"到一条"响应曲线"</h3>
+      <p>上一课说"调频率能改电压"，但控制设计需要更精确：<strong>拧 1kHz，电压到底变多少？变多快？</strong>这就是传递函数 Gvd(s) 回答的问题。</p>
+      <p>在数学上，你的 LLC 从 <code class="inline">fs</code> 到 <code class="inline">Vout</code> 的小信号模型是三阶的：</p>
+      <div class="formula">
+        Gvd(s) = K_f · <span class="lbl">(1 + s/ω<sub>z_lm</sub>)</span> / <span class="lbl">(1 + s/ω<sub>p_out</sub>) · (1 + s/(ω<sub>r</sub>Q<sub>r</sub>) + s²/ω<sub>r</sub>²)</span>
+      </div>
+      <p>不用被公式吓到——它只是三个"性格特征"的乘积，每个对应一个物理东西：</p>
+
+      <table>
+        <tr><th>因子</th><th>数值</th><th>物理含义</th><th>影响</th></tr>
+        <tr><td><b>K_f</b>（直流增益）</td><td class="num">-0.748 V/kHz</td><td>拧 1kHz 频率，输出稳态变 0.75V</td><td>决定"旋钮的力气"</td></tr>
+        <tr><td><b>输出极点</b> fp_out</td><td class="num">19.9 Hz</td><td>Co=100µF × 负载 80Ω，τ=8ms（满载值；轻载 Rload 变大，极点左移）</td><td>决定"响应多慢"</td></tr>
+        <tr><td><b>谐振极点</b> fr</td><td class="num">107 kHz</td><td>谐振腔的固有振荡</td><td>离得远，影响小</td></tr>
+      </table>
+
+      <p><strong class="hl">K_f 为什么是负的？</strong>因为它继承"反相"：fs↑ → Vout↓，所以灵敏度是负数。后面所有设计都带着这个负号。</p>
+      <p><strong class="hl">输出极点 19.9Hz 从哪来？</strong>输出电容要充放电，电荷变化要经过负载电阻，这构成一个一阶低通，时间常数 τ = R<sub>load</sub>·C<sub>o</sub> = 80Ω × 100µF = 8ms，对应极点频率 1/(2πτ) ≈ 19.9Hz。含义：你拧了旋钮，电压不会立刻到，要"充电 8ms 量级"。</p>
+
+      <h3>2.2 极点到底怎么决定"快慢"——亲手看</h3>
+      <p>极点位置是理解一切的关键。下面左边是 s 平面，右边是对应的二阶系统阶跃响应。拖动 <code class="inline">ζ</code>（阻尼）和 <code class="inline">ωn</code>（自然频率）感受：</p>
+
+      <div class="interactive" data-int="poles">
+        <span class="int-tag">交互 02 · 极点位置 ↔ 阶跃响应</span>
+      </div>
+
+      <ul>
+        <li><strong>离虚轴越远</strong>（ωn 大）→ 振荡越快、峰越早。</li>
+        <li><strong>ζ 越小</strong>（极点越靠虚轴）→ 振荡越剧烈、衰减越慢。</li>
+        <li><strong>ζ ≥ 1</strong> → 完全不振荡（过阻尼）。</li>
+        <li>我们的被控对象在输出极点处 ζ=1（实极点，不振荡，慢），在谐振极点处 ζ≈1/2（会振荡，但 107kHz 太远，环路感觉不到）。</li>
+      </ul>
+
+      <div class="callout">
+        <span class="t">🧠 结论</span>
+        被控对象 Gvd(s) = <strong>一个增益 K_f + 一个慢极点(19.9Hz) + 一个很远的谐振极点(107kHz)</strong>。
+        环路设计只要对付 K_f 和那个慢极点就够了——这就是为什么穿越频率敢设在 2kHz（离 107kHz 有 50 倍距离）。
+      </div>
+    </section>
+
+    <!-- ================= 03 负反馈 ================= -->
+    <section id="ch3">
+      <h2>第三课 · 负反馈与稳态误差</h2>
+      <p class="ch-sub">为什么一定要闭环，为什么一定要积分</p>
+
+      <h3>3.1 开环为什么不行</h3>
+      <p>如果不用反馈：把频率固定死（比如开环 107kHz），那么输出 = 增益 × 输入。但输入电压在 360–440V 之间变化，负载也在变——输出电压会跟着飘，永远到不了精确的 200V。开环是"盲拧"。<br>
+      <strong>负反馈</strong>的做法：量到实际 Vout，跟目标 200V 比出偏差 err，再按偏差去拧旋钮。这样不管什么扰动，只要偏差不为零，系统就会一直纠正，直到偏差消失。</p>
+
+      <div class="formula">
+        vref ─(+)──► <span class="lbl">补偿器 C(z)</span> ── fs ──► <span class="lbl">对象 Gvd(s)</span> ──► Vout
+          &nbsp;&nbsp;▲&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
+          &nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▲&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
+        err = vref − vmeas &nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;（采样 vmeas）
+      </div>
+
+      <h3>3.2 关键一环：为什么必须"积分"</h3>
+      <p>假设只用纯比例：<code class="inline">fs = fr + Kp·err</code>。电压偏低一点 → 频率往下一点 → 电压回升一点，但回升的幅度恰好让 err 变小、纠正减弱……最终停在一个<strong>还有残差的平衡点</strong>，永远差一点（叫稳态误差）。因为 Kp·err 需要一个非零的 err 才能撑着。</p>
+      <p><strong>积分项</strong>把历史误差累加起来：只要 err 不为零，累加值就一直增长，输出的修正就一直加大，直到把 err 压到零。所以：<strong class="hl">积分 = 精确消除稳态误差</strong>。</p>
+      <p>在传函上，"积分"就是分母里那个 <code class="inline">s</code>（<code class="inline">1/s</code> 对直流有无限增益）。你的补偿器长这样：</p>
+      <div class="formula">
+        C(s) = K<sub>c</sub> · (1 + s/ω<sub>z</sub>) / <span class="lbl">s</span> · (1 + s/ω<sub>p</sub>)
+      </div>
+      <p>分母那个 <code class="inline">s</code> 就是积分。它在 0Hz 给出无限大增益 → 输出精确等于 200.000V，不差一毫。</p>
+
+      <div class="callout">
+        <span class="t">🔑 一句话</span>
+        反馈保证"方向对"，积分保证"误差归零"，剩下的问题就是"多快、稳不稳"——那是下一课。
+      </div>
+    </section>
+
+    <!-- ================= 04 Bode 与稳定性 ================= -->
+    <section id="ch4">
+      <h2>第四课 · Bode 图与稳定性</h2>
+      <p class="ch-sub">穿越频率、相位裕度：环路的"体检指标"</p>
+
+      <h3>4.1 Bode 图在说什么</h3>
+      <p>把开环传递函数 L(s) = C(s)·Gvd(s) 在各个频率下求一遍：<strong>放大多少倍（增益 dB）</strong>、<strong>相位挪多少（相位 °）</strong>，画出来就是 Bode 图。它回答两个问题：</p>
+      <ul>
+        <li><strong>这个频率的扰动，环路能纠得多用力？</strong>→ 看增益曲线</li>
+        <li><strong>环路对这个扰动，是及时反应还是反应过头？</strong>→ 看相位曲线</li>
+      </ul>
+
+      <h3>4.2 两个体检指标</h3>
+      <table>
+        <tr><th>指标</th><th>物理含义</th><th>设计值</th></tr>
+        <tr><td><b>穿越频率 fco</b></td><td>增益 = 1（0dB）的频率。<strong>环路能纠正多快的扰动</strong>。≈ 响应速度。</td><td class="num">~2 kHz</td></tr>
+        <tr><td><b>相位裕度 PM</b></td><td>在 fco 处，相位离 -180°（振荡线）还剩多少。剩得越多越稳。</td><td class="num">70.5°</td></tr>
+      </table>
+      <p>直觉：<strong>骑自行车</strong>。你每偏离直线一点就往回扶一下——但如果你"扶"的增益太大（反应过头），加上 2 拍延迟，就会左右蛇形（振荡）；如果增益太小，就压不住风（扰动）。相位裕度就是你心里默数的那一拍，还能不能来得及修正。PM ≤ 0 → 振荡/发散。</p>
+
+      <h3>4.3 亲手试试：把增益调大看它怎么垮</h3>
+      <p>下面这个交互就是你的环路。默认是设计点（fco≈2kHz，PM≈80° 连续域）。<strong>拖动 K_c 倍率</strong>：拉大到 2×、4×、6×……看 fco 右移、PM 掉，再到下面"稳定性演示"里看时域真的振荡发散。</p>
+
+      <div class="interactive" data-int="bode">
+        <span class="int-tag">交互 03 · 开环 Bode 设计台（先只动 K_c）</span>
+      </div>
+
+      <div class="interactive" data-int="stability">
+        <span class="int-tag">交互 04 · 稳定性演示：拉大 K_c 看到发散</span>
+      </div>
+
+      <div class="callout danger">
+        <span class="t">⚡ 稳定性铁律</span>
+        fco 处相位若低于 -180°，环路就变成正反馈 → 电压来回冲 → 炸。
+        PM 就是"离这条线还差多远"。<strong>PM ≥ 45° 是底线，我们留到 70°</strong>——多留的 25° 是给"吃相位"的因素准备的：采样保持+一拍延迟（约 10°）、谐振模型简化、以及 Lm/Co 实测与设计值的偏差。留足了，最坏情况（参数离散）也不振荡。
+      </div>
+    </section>
+
+    <!-- ================= 05 补偿器设计 ================= -->
+    <section id="ch5">
+      <h2>第五课 · 补偿器设计</h2>
+      <p class="ch-sub">Type II：积分 + 一个零点 + 一个高频极点，各治一个病</p>
+
+      <h3>5.1 补偿器 = 按对象的"性格"配眼镜</h3>
+      <p>被控对象有毛病（慢极点、噪声敏感），补偿器就对症下药。你的 Type II 补偿器三个环节，各治一个：</p>
+      <table>
+        <tr><th>环节</th><th>位置</th><th>治什么</th><th>类比</th></tr>
+        <tr><td><b>积分</b>（分母 s）</td><td>低频</td><td>消除稳态误差，精确 200V</td><td>盯死车道不跑偏</td></tr>
+        <tr><td><b>零点</b></td><td>20 Hz</td><td>抵消 19.9Hz 输出极点，把相位坑填平 → 才能提穿越频率</td><td>近视散光各配一片镜片</td></tr>
+        <tr><td><b>高频极点</b></td><td>10 kHz</td><td>压掉 107kHz 开关纹波和采样噪声</td><td>屏蔽高频杂音</td></tr>
+      </table>
+      <p>为什么要"零点去抵输出极点"？因为那个 19.9Hz 极点让相位往 -90° 掉，如果不抵消，环路在低频就亏相位，穿越频率只能做得很低（响应慢）。零点在它附近，把相位坑补回来，才允许 fco 提到 2kHz。</p>
+
+      <h3>5.2 亲手试试：把补偿器拆了再装上</h3>
+      <p>回到 Bode 设计台，这次 <strong>三个滑杆都动</strong>：</p>
+      <ul>
+        <li><strong>零点拖离 20Hz</strong>（比如拖到 1Hz 或 200Hz）→ 看相位曲线在 fco 附近的"坑"回来，PM 掉。</li>
+        <li><strong>高频极点拖到 1kHz</strong> → 看它把 fco 拽低、PM 掉。</li>
+        <li><strong>K_c 拉大</strong> → fco 右移逼近谐振区，PM 掉。</li>
+      </ul>
+      <p>设计目标：<strong>fco≈2kHz 处 PM ≥ 45°</strong>。你会发现"设计好的补偿器"就是三个参数的精确搭配——这就是配眼镜。</p>
+
+      <div class="callout">
+        <span class="t">🧪 设计出来的指标（连续域）</span>
+        K<sub>c</sub> = -1.6848×10⁷，零点 20Hz，极点 10kHz<br>
+        fco ≈ <strong>1960 Hz</strong>，PM ≈ <strong>80.4°</strong>，GM ≈ <strong>43.8 dB</strong><br>
+        穿越频率只有开关频率（107kHz）的 1/50——这是刻意的：环路只"看平均"，不跟开关纹波较劲。
+      </div>
+    </section>
+
+    <!-- ================= 06 数字化 ================= -->
+    <section id="ch6">
+      <h2>第六课 · 数字化：从传函到代码</h2>
+      <p class="ch-sub">每开关周期看一眼、算一次、动一次手</p>
+
+      <h3>6.1 数字控制器失去了什么</h3>
+      <p>模拟控制器是"一直盯着"的；数字控制器是<strong>每隔 9.35µs（1/107kHz）眨一眼</strong>：采样 → 算偏差 → 跑差分方程 → 写频率寄存器。代价有二：</p>
+      <ul>
+        <li><strong>采样</strong>（ZOH 保持）：本来连续的信号变成台阶。</li>
+        <li><strong>一拍计算延迟</strong>：这一拍看到的电压，下一拍才轮到修正。</li>
+      </ul>
+      <p>两者合起来，在 2kHz 穿越处吃掉约 <strong>10° 相位</strong>。所以连续域 PM 80.4°，离散后 <strong>70.5°</strong>——这就是为什么设计要"离散化后再验一遍"。</p>
+
+      <h3>6.2 Tustin：把 s 域翻译成 z 域</h3>
+      <p>补偿器是连续传函 C(s)，单片机不能算 s，要用一个近似把连续变成离散差分方程。常用 <strong>Tustin 变换</strong>：</p>
+      <div class="formula">
+        s = (2/T<sub>s</sub>) · (z − 1)/(z + 1)，&nbsp;&nbsp;T<sub>s</sub> = 1/f<sub>r</sub> = 9.35µs
+      </div>
+      <p>代入 C(s) 展开，得到 <strong>2p2z</strong>（两个零点两个极点）的标准形式，最后变成三行差分方程（直接 II 型）：</p>
+<pre><code>// 每开关周期调用一次。err = vref − vmeas
+w  = b0*err + x1;         // w = 本拍修正量
+x1 = b1*err - a1*w + x2;  // x1, x2 是环路的"记忆"
+x2 = b2*err - a2*w;
+fs = clamp(fr + w, 95k, 130k);   // 频率指令，带回钳位
+</code></pre>
+      <p><code class="inline">x1, x2</code> 存的是历史误差与输出的加权记忆——它们让"积分"存在（这就是上一课那个积分在数字世界的落地）。<strong>clamp</strong> 是硬限制：95–130kHz，防止频率出界，也防止积分越积越大（抗饱和）。</p>
+
+      <h3>6.3 系数怎么来</h3>
+      <p>这套系数（b0…a2）不是你手算的，是 <code class="inline">llc_loop_design.m</code> 自动算出来的：设计 C(s) → Tustin 离散 → 提取系数 → 写进 <code class="inline">llc_controller.h</code>。你要改的是参数（Lm、Co），不是系数。</p>
+      <pre><code>#define LC_B0  -30456.16f
+#define LC_B1  -35.76f
+#define LC_B2  30420.40f
+#define LC_A1  -1.54594f
+#define LC_A2  0.54594f</code></pre>
+      <div class="callout warn">
+        <span class="t">⚠️ 负号别删</span>
+        b0、b1 是负的，因为整个对象是反相的（fs↑→Vout↓）。删掉负号 = 正反馈 = 上电即炸。
+      </div>
+    </section>
+
+    <!-- ================= 07 实战复盘 ================= -->
+    <section id="ch7">
+      <h2>第七课 · 实战复盘：你的 1kW 样机全程</h2>
+      <p class="ch-sub">把前六课串成一条生产线</p>
+
+      <h3>7.1 起点：样机参数</h3>
+      <table>
+        <tr><th>参数</th><th>值</th><th>参数</th><th>值</th></tr>
+        <tr><td>输入 Vin</td><td class="num">360–440V</td><td>Lr</td><td class="num">270µH</td></tr>
+        <tr><td>输出</td><td class="num">±200V / 各 500W</td><td>Cr</td><td class="num">8.2nF</td></tr>
+        <tr><td>变比 n</td><td class="num">2:1</td><td>Lm/Lr</td><td class="num">≈5（待实测）</td></tr>
+        <tr><td>fr</td><td class="num">107kHz</td><td>Co</td><td class="num">100µF/路（待确认）</td></tr>
+      </table>
+
+      <h3>7.2 生产线：从物理到系数</h3>
+      <ol>
+        <li><strong>谐振参数</strong>：fr、fm、Z0、Q —— 算出满载工作点 Q = 1.40。</li>
+        <li><strong>增益与灵敏度</strong>：FHA 增益曲线 → K_f = -0.748 V/kHz（负载无关）。</li>
+        <li><strong>被控对象</strong>：Gvd(s) 三阶，输出极点 19.9Hz（满载，轻载左移），谐振极点 107kHz。</li>
+        <li><strong>补偿器</strong>：Type II（积分 + 20Hz 零点 + 10kHz 极点），K_c = -1.68×10⁷ → 连续域 fco 1960Hz / PM 80.4° / GM 43.8dB。</li>
+        <li><strong>离散化</strong>：Tustin → 2p2z 系数 → 含一拍延迟 PM 70.5°。</li>
+        <li><strong>闭环验证</strong>：离散闭环仿真 → 峰值偏差、恢复时间。</li>
+        <li><strong>固件</strong>：2p2z 三行代码 + 频率钳位 + 过流保护 + HRTIM 写入。</li>
+      </ol>
+
+      <h3>7.3 亲手看看闭环干活</h3>
+      <p>这就是你样机跑起来的线性模型。拖动"负载扰动"，看环路怎么把电压拉回来：</p>
+
+      <div class="interactive" data-int="step-sim">
+        <span class="int-tag">交互 05 · 闭环阶跃仿真（真实 2p2z 系数）</span>
+      </div>
+      <ul>
+        <li><strong>扰动越大，电压瞬时偏差越大</strong>，但环路总能拉回 200V（积分保证稳态误差为零）。</li>
+        <li>看下面的 fs 曲线：扰动来了，频率自动往下压（升压方向）去抵消扰动——这就是"旋钮在工作"。</li>
+        <li>恢复时间大约几毫秒，这就是 fco≈2kHz 对应的速度。</li>
+      </ul>
+
+      <h3>7.4 固件里的最后一公里</h3>
+      <p>控制器算出的 fs 要写进 HRTIM 的周期寄存器：</p>
+<pre><code>PER = HRTIM_CLK / fs;            // 107kHz→1588, 95kHz→1789, 130kHz→1307
+HRTIM1->sTimerxRegs[HRTIM_TIMERID_TIMER_D].PERxR = PER;
+HRTIM1->sTimerxRegs[HRTIM_TIMERID_TIMER_D].CR2 |= HRTIM_CR2_SWU;
+</code></pre>
+      <div class="callout">
+        <span class="t">✅ 最终体检表（离散域）</span>
+        fco ≈ <strong>1962 Hz</strong> · PM ≈ <strong>70.5°</strong> · GM ≈ <strong>43.8 dB</strong> · 每开关周期控制（9.35µs）
+      </div>
+    </section>
+
+    <!-- ================= 08 答疑 ================= -->
+    <section id="ch8">
+      <h2>第八课 · 答疑：那些"为什么"</h2>
+      <p class="ch-sub">把你设计里真正会问出口的问题一次答完</p>
+
+      <h3>8.1 为什么满载 + 360V 时 ±200V 会稳不住？</h3>
+      <p>因为<strong>谐振腔的物理极限</strong>：360V 输入要得到 200V 输出，需要增益 M = 400/360 = <strong>1.111</strong>。但满载时阻尼很大（Q=1.4），增益峰值只有 <strong>M_max = 1.011</strong>（回 01 课的曲线看看）。物理上给不出 1.111，所以控制器把旋钮拧到底（fs_min=95kHz）也没用，输出随输入跌落。<strong>这是硬件问题，不是环路问题</strong>。要改得调 Lm/Lr 或 Lr/Cr（降 Q），让秋千能荡更高——代价是 ZVS 裕量和轻载效率。</p>
+
+      <h3>8.2 K_f 会随负载变吗？——一个被纠正的旧说法</h3>
+      <p>早期版本用了一个不完整的 FHA 公式，得到"K_f 随负载变 4 倍"的结论（满载 -0.535，25% 负载 -2.138 V/kHz）。用标准 FHA 公式核对后：<strong>fn=1 处增益曲线斜率 dM/dfn = -2/m，与负载 Q 无关</strong>，所以 K_f 恒为 <strong>-0.748 V/kHz</strong>。真正随负载变的是<strong>输出极点</strong>：轻载时 Rload 变大，fp_out = 1/(2π·Rload·Co) 左移（50% → 10Hz）。极点左移让低频增益变平、fco 下移，PM 反而更高（50% 负载 PM 84.5°，25% 负载 85.8°）。<strong>结论反过来了：负载越轻，环路越稳</strong>——"一个增益发四个负载都稳"这件事比原来想的更省心。</p>
+
+      <h3>8.3 为什么穿越频率敢设在 2kHz 而不是 20kHz？</h3>
+      <p>三个理由：① 离开关频率 107kHz 有 50 倍远，环路"看平均不看纹波"，模型里的谐振极点影响可忽略（只有 12°）；② 2kHz 已远高于输出极点 19.9Hz，动态足够快；③ 再快就要跟开关纹波和采样噪声较劲，还会逼近采样保持 + 一拍延迟带来的相位损失上限。</p>
+
+      <h3>8.4 为什么 ADC 采样必须快？</h3>
+      <p>设计是按<strong>每开关周期控制</strong>做的（Ts = 9.35µs）。如果采样要 60µs（现在的 640 周期采样），一个控制周期都做不完，等于把控制率降到 1/6，环路带宽大打折扣，还会引入额外延迟。<strong>实测前必须把 ADC 采样缩短到 ≤4.5µs</strong>。</p>
+
+      <h3>8.5 为什么 Lm 必须实测？</h3>
+      <p>Lm 进 K_f 的公式（K_f ∝ -2/m，m=Lm/Lr），直接决定增益标定；还决定 M_max（升压能力）和 fm。设计里按 Lm=5×Lr 假设，如果实测是 4 或 6，K_f 会偏 20% 上下（m=4 时 K_f 大 25%）。<strong>用 LCR 表量原边电感</strong>，改完重跑 <code class="inline">llc_loop_design.m</code>，系数自动更新。</p>
+    </section>
+
+    <!-- ================= 09 练习 ================= -->
+    <section id="quiz">
+      <h2>练习 · 考考自己</h2>
+      <p class="ch-sub">点击展开答案。全对，你就算入门了。</p>
+
+      <details>
+        <summary>Q1：你的 LLC 想提高输出电压，应该把开关频率 fs 调高还是调低？</summary>
+        <div class="ans">调低。</div>
+        <div class="expl">fs 低于 fr 进入升压区，增益 M &gt; 1。旋钮是反相的：fs↑→Vout↓，所以升压要 fs↓。</div>
+      </details>
+
+      <details>
+        <summary>Q2：满载 360V 输入时，为什么调频也救不回 ±200V？</summary>
+        <div class="ans">谐振腔增益有物理上限 M_max=1.011，而 360V 需要 1.111。</div>
+        <div class="expl">控制器把频率压到 fs_min 就到底了（低于 fn≈0.95 增益反而回落），剩下的缺口是谐振腔给不出来的——这是硬件极限，要改 Lm/Lr 或 Lr/Cr。</div>
+      </details>
+
+      <details>
+        <summary>Q3：补偿器里的"零点在 20Hz"是干什么的？去掉会怎样？</summary>
+        <div class="ans">抵消被控对象 19.9Hz 的输出极点，把低频相位坑补平。</div>
+        <div class="expl">不去掉的话相位亏得多，穿越频率只能做低、响应变慢。回到 05 课的 Bode 设计台把零点拖到 1Hz，看 PM 掉多少。</div>
+      </details>
+
+      <details>
+        <summary>Q4：轻载时环路更危险，对吗？</summary>
+        <div class="ans">反了，轻载反而更稳。</div>
+        <div class="expl">K_f 与负载无关（-0.748 V/kHz）。轻载时输出极点左移，fco 下移、PM 上升（50% 负载 PM 84.5°，25% 负载 85.8°）。最坏工况是满载，所以设计按满载整定即可。</div>
+      </details>
+
+      <details>
+        <summary>Q5：离散化把 PM 从 80.4° 变成 70.5°，那 10° 去哪了？</summary>
+        <div class="ans">采样保持 + 一拍计算延迟。</div>
+        <div class="expl">数字控制器每 9.35µs 才看一次、下一拍才动手，在 2kHz 穿越处大约损失 10°。这就是"离散后要重验一遍裕度"的原因。</div>
+      </details>
+    </section>
+
+    <footer>
+      本教学网站配套 <code class="inline">llc_loop_design.m</code> 与 <code class="inline">control-loop/README.md</code>。
+      所有数值基于 1kW 样机参数（Lr=270µH, Cr=8.2nF, n=2:1）。改参数请重跑 MATLAB 脚本。
+    </footer>
+
+  </article>
+  </main>
+</div>
+
+<script src="js/llc-math.js"></script>
+<script src="js/llc-plots.js"></script>
+<script src="js/llc-interactive.js"></script>
+<script src="js/llc-main.js"></script>
+</body>
+</html>

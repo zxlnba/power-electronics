@@ -54,7 +54,8 @@ fprintf('Rac'' = %.1f ohm,  Q(满载) = %.3f\n', Rac, Q);
 fprintf('Rload_rail = %.1f ohm,  fp_out = %.1f Hz\n\n', Rload_rail, fp_out);
 
 %% ============ 3. FHA 增益曲线与升压裕量 ============
-% M(fn,Q,m) = 1/|1 + ((fn^2-1)/fn)*(1/(fn*m*Q)+j)|
+% 标准 FHA：M(fn,Q,m) = 1/sqrt((1+λ-λ/fn²)² + Q²(fn-1/fn)²)，λ=Lr/Lm=1/m
+% （与精确 AC 电路传递 |Zp/(Zseries+Zp)| 一致，见 fha_gain 注释）
 fn = linspace(0.55, 1.6, 4000);
 Mfull = arrayfun(@(x) fha_gain(x,Q,Lm_ratio), fn);
 Mhalf = arrayfun(@(x) fha_gain(x,Q/2, Lm_ratio), fn);   % 50% 负载: Rac×2, Q/2
@@ -68,15 +69,13 @@ fprintf('  360V 输入需要 M=%.3f -> 满载无法保持 ±200V（输出将随�
 fprintf('  50%%负载 M_max=%.3f (%.0fV), 25%%负载 M_max=%.3f (%.0fV)\n\n', ...
         max(Mhalf), Vin_nom/max(Mhalf), max(Mquar), Vin_nom/max(Mquar));
 
-%% ============ 4. 静态灵敏度 K_f（满载，fs=fr） ============
-% dM/dfn @fn=1 = -2/(m*Q)；dVout/dfs = (Vin/n)*dM/dfn/fr
-dMdfn = -2/(Lm_ratio*Q);
+%% ============ 4. 静态灵敏度 K_f（fs=fr 工作点） ============
+% dM/dfn @fn=1 = -2/m（标准 FHA 公式性质：与负载 Q 无关）
+% dVout/dfs = (Vin/n)*dM/dfn/fr
+dMdfn = -2/Lm_ratio;
 K_f   = (Vin_nom/n) * dMdfn / fr;     % V/Hz（负：fs↑ 则 Vout↓）
-K_f50 = (Vin_nom/n) * (-2/(Lm_ratio*Q/2))/fr;   % 50% 负载 Q/2
-K_f25 = (Vin_nom/n) * (-2/(Lm_ratio*Q/4))/fr;   % 25% 负载 Q/4
 fprintf('===== 静态灵敏度 K_f = dVout/dfs =====\n');
-fprintf('满载 = %.3f V/kHz   50%% = %.3f   25%% = %.3f  (增益随负载变化 %.1fx)\n\n', ...
-        K_f*1e3, K_f50*1e3, K_f25*1e3, K_f25/K_f);
+fprintf('K_f = %.3f V/kHz（与负载无关；负载只影响输出极点位置）\n\n', K_f*1e3);
 
 %% ============ 5. 降阶被控对象模型 ============
 % Gvd(s) = K_f*(1+s/wz_lm) / ( (1+s/wp_out)*(1 + s/(wr*Qr) + s^2/wr^2) )
@@ -108,6 +107,19 @@ fprintf('===== 连续域设计 =====\n');
 fprintf('K_c = %.4e  Hz·s/V\n', Kc);
 fprintf('fco = %.0f Hz,  PM = %.1f deg,  GM = %.1f dB\n\n', Wcp/2/pi, Pm, 20*log10(Gm));
 
+%% ============ 7b. 负载敏感性（K_f 恒定，fp_out 随负载左移） ============
+% Rload = Vout²/P ∝ 1/Q，故 fp_out(q) = fp_out·(q/Q)
+fprintf('===== 负载敏感性（K_f 不变，输出极点移动） =====\n');
+for qq = [Q, Q/2, Q/4]
+    fp_q = fp_out*(qq/Q);
+    Gvd_q = K_f * (1+s/(2*pi*fm)) / ( (1+s/(2*pi*fp_q)) * (1 + s/(2*pi*fr*Qr) + (s/(2*pi*fr))^2 ) );
+    L_q = C * Gvd_q;
+    [Gmq,Pmq,~,Wcpq] = margin(L_q);
+    fprintf('  Q=%.3f  fp_out=%.1f Hz  fco=%.0f Hz  PM=%.1f deg  GM=%.1f dB\n', ...
+            qq, fp_q, Wcpq/2/pi, Pmq, 20*log10(Gmq));
+end
+fprintf('\n');
+
 %% ============ 8. 离散化（每开关周期控制，含一拍延迟） ============
 % 控制率 = 开关频率 107kHz, Ts = 1/fr
 Ts = 1/fr;
@@ -131,12 +143,12 @@ fprintf('  #define LC_A2  %.8ff\n\n', a2);
 % 注意：这里是线性小信号验证（模型裕度），非线性仿真请在 PLECS 中做。
 Gd = c2d(Gvd, Ts, 'zoh');          % 对象离散化（ZOH）
 [A,B,Cc,Dd] = ssdata(ss(Gd));      % 离散状态空间
-d2d  = 10;
+d2d  = 1;                          % 与控制器同采样率（Ts），避免步长错配放大峰值
 N    = 4000;
 t    = (0:N-1)*Ts*d2d;
 vref = Vout_rail*ones(1,N);
 step_at = round(0.008/(Ts*d2d));   % 8ms 处加入扰动
-d_f = 10e3;                        % 输入扰动 +10kHz => 若开环输出跌 ~5.3V
+d_f = 10e3;                        % 输入扰动 +10kHz => 若开环输出跌 ~7.5V
 x1=0; x2=0; x=zeros(size(A,1),1);
 fs_cmd = fr*ones(1,N);  y = Vout_rail*ones(1,N);
 for k = 2:N
@@ -169,7 +181,7 @@ plot(fn, Mfull,'LineWidth',1.8); hold on;
 plot(fn, Mhalf,'--','LineWidth',1.4);
 plot(fn, Mquar,'--','LineWidth',1.4);
 yline(1,'k:'); yline(Vin_nom/360,'r--','M=1.111 @360V','LabelVerticalAlignment','bottom');
-yline(1.0119,'r:','M_max 满载');
+yline(MMax_full,'r:','M_max 满载');
 xline(1,'k:'); ylim([0.5 1.4]); grid on;
 xlabel('fn = fs/fr'); ylabel('电压增益 M');
 legend('满载 (Q=1.4)','50%负载','25%负载','Location','northeast');
@@ -210,9 +222,10 @@ fprintf('再用控制回路库做闭环仿真，最后上真机。详见 control
 
 %% ============ 辅助函数 ============
 function M = fha_gain(fn,q,mm)
-% FHA 电压增益
-z = (fn.^2-1)./fn .* (1./(fn*mm*q) + 1j);
-M = 1./abs(1+z);
+% FHA 电压增益（标准公式，与精确 AC 电路传递一致）
+% M(fn,Q,m) = 1/sqrt((1+λ-λ/fn²)² + Q²(fn-1/fn)²)，λ=Lr/Lm=1/m
+la = 1/mm;
+M = 1./sqrt( (1+la-la./fn.^2).^2 + (q.*(fn-1./fn)).^2 );
 end
 
 function [b0,b1,b2,a1,a2] = disp2p2z(Cz)
