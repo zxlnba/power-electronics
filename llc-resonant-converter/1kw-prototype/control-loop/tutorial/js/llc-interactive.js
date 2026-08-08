@@ -59,7 +59,7 @@ const Int = (function () {
     function draw() {
       const { ctx, w, h } = Plot.setup(cv, +cv.dataset.W, +cv.dataset.H);
       Plot.clear(ctx, w, h);
-      const pad = { l: 62, r: 18, t: 26, b: 42 };
+      const pad = { l: 62, r: 18, t: 26, b: 42, w, h };
       const fnMin = 0.4, fnMax = 1.7;
       const tr = Plot.log(fnMin, fnMax, 0.4, 1.6, pad);
       const q = loads[lk].q;
@@ -118,7 +118,7 @@ const Int = (function () {
       // ---- s 平面 ----
       const { ctx, w, h } = Plot.setup(cvS, +cvS.dataset.W, +cvS.dataset.H);
       Plot.clear(ctx, w, h);
-      const pad = { l: 46, r: 14, t: 16, b: 40 };
+      const pad = { l: 46, r: 14, t: 16, b: 40, w, h };
       const sMin = -1700, sMax = 100, wMax = 1600;
       const tr = Plot.lin(sMin, sMax, -wMax, wMax, pad);
       // 轴
@@ -145,7 +145,7 @@ const Int = (function () {
       // ---- 阶跃响应 ----
       const { ctx: c2, w: w2, h: h2 } = Plot.setup(cvY, +cvY.dataset.W, +cvY.dataset.H);
       Plot.clear(c2, w2, h2);
-      const padY = { l: 40, r: 14, t: 20, b: 40 };
+      const padY = { l: 40, r: 14, t: 20, b: 40, w: w2, h: h2 };
       const tMax = Math.max(0.06, 6 / (zeta * wn));
       const trY = Plot.lin(0, tMax, -0.3, 1.5, padY);
       const xs = [], ys = [];
@@ -194,7 +194,7 @@ const Int = (function () {
       const m = LLC.bodeMargin(LLC.P.Q, { kc, wzHz: wz, wpHz: wp });
 
       // ---- 增益面板 ----
-      const pad1 = { l: 54, r: 16, t: 30, b: 26 };
+      const pad1 = { l: 54, r: 16, t: 30, b: 26, w, h };
       const tr1 = Plot.log(fMin, fMax, -100, 100, pad1);
       Plot.grid(ctx, tr1, Plot.logTicks(fMin, fMax), Plot.linTicks(-100, 100, 10));
       Plot.line(ctx, tr1, fs, mags, { color: '#2563eb', lineWidth: 2.2 });
@@ -205,7 +205,7 @@ const Int = (function () {
       Plot.label(ctx, 'fco = ' + m.fco.toFixed(0) + ' Hz', tr1.x(m.fco) + 6, tr1.y(6), { color: '#10b981', size: 12 });
 
       // ---- 相位面板 ----
-      const pad2 = { l: 54, r: 16, t: 42, b: 26 };
+      const pad2 = { l: 54, r: 16, t: 42, b: 26, w, h };
       const tr2 = Plot.log(fMin, fMax, -360, 0, pad2);
       Plot.grid(ctx, tr2, Plot.logTicks(fMin, fMax), Plot.linTicks(-360, 0, 6));
       Plot.line(ctx, tr2, fs, phU, { color: '#f59e0b', lineWidth: 2.2 });
@@ -245,7 +245,7 @@ const Int = (function () {
       const div = Math.max(...Array.from(s.vout)) > 280 || Math.min(...Array.from(s.vout)) < 120 ||
         Array.from(s.vout).some(v => !isFinite(v));
 
-      const pad1 = { l: 48, r: 16, t: 28, b: 26 };
+      const pad1 = { l: 48, r: 16, t: 28, b: 26, w, h };
       const tr1 = Plot.lin(0, s.t[s.t.length - 1], 140, 260, pad1);
       Plot.grid(ctx, tr1, Plot.linTicks(0, s.t[s.t.length - 1], 8), Plot.linTicks(150, 250, 5));
       Plot.hline(ctx, tr1, 200, { color: '#f43f5e', dash: [4, 3] });
@@ -253,7 +253,7 @@ const Int = (function () {
       Plot.label(ctx, 'Vout (V)，负载阶跃在 7.5ms', tr1.pad.l, 14, { size: 12 });
       Plot.label(ctx, 't (s)', tr1.pad.w - 2, tr1.pad.h - 4, { size: 11, align: 'right' });
 
-      const pad2 = { l: 48, r: 16, t: 52, b: 26 };
+      const pad2 = { l: 48, r: 16, t: 52, b: 26, w, h };
       const tr2 = Plot.lin(0, s.t[s.t.length - 1], 90, 150, pad2);
       Plot.grid(ctx, tr2, Plot.linTicks(0, s.t[s.t.length - 1], 8), Plot.linTicks(95, 145, 5));
       Plot.line(ctx, tr2, s.t, s.fs.map(f => f / 1e3), { color: '#f59e0b', lineWidth: 1.8 });
@@ -289,7 +289,7 @@ const Int = (function () {
       const P = LLC.P;
       const tMax = s.t[s.t.length - 1];
 
-      const pad1 = { l: 48, r: 16, t: 28, b: 26 };
+      const pad1 = { l: 48, r: 16, t: 28, b: 26, w, h };
       const tr1 = Plot.lin(0, tMax, 190, 210, pad1);
       Plot.grid(ctx, tr1, Plot.linTicks(0, tMax, 8), Plot.linTicks(192, 208, 8));
       Plot.hline(ctx, tr1, 200, { color: '#f43f5e', dash: [4, 3] });
@@ -297,7 +297,7 @@ const Int = (function () {
       Plot.label(ctx, 'Vout (V) — 目标 200V', tr1.pad.l, 14, { size: 12 });
       Plot.label(ctx, 't (s)', tr1.pad.w - 2, tr1.pad.h - 4, { size: 11, align: 'right' });
 
-      const pad2 = { l: 48, r: 16, t: 52, b: 26 };
+      const pad2 = { l: 48, r: 16, t: 52, b: 26, w, h };
       const tr2 = Plot.lin(0, tMax, 90, 140, pad2);
       Plot.grid(ctx, tr2, Plot.linTicks(0, tMax, 8), Plot.linTicks(95, 135, 8));
       Plot.line(ctx, tr2, s.t, s.fs.map(f => f / 1e3), { color: '#f59e0b', lineWidth: 1.8 });
