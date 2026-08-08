@@ -233,7 +233,7 @@ E:0             ← ADC 错误码 (0=正常)
 Gvd(s) = K_f·(1+s/ωz_lm) / ((1+s/ωp_out)·(1+s/(ωr·Qr)+s²/ωr²))
 C(z)   = 2p2z，Ts = 1/fr = 9.35µs（每开关周期控制）
 指标：fco ≈ 2kHz，PM ≈ 70°（含 1 拍延迟），GM ≈ 44dB
-      K_f = -0.748 V/kHz（负载无关），2p2z 系数见 llc_controller.h
+      K_f = -0.748 V/kHz（负载无关），2p2z 系数见 llc_ctrl.h
 ```
 
 详见 [`control-loop/`](./control-loop/)（设计推导 + MATLAB 脚本 + 闭环验证 + PLECS 验证步骤）
@@ -258,11 +258,11 @@ C(z)   = 2p2z，Ts = 1/fr = 9.35µs（每开关周期控制）
 │   ├── NEW YEAR.ioc                             ← CubeMX 工程
 │   └── src/
 │       ├── main.c / main.h
-│       ├── adc.c / adc.h
-│       ├── voltage_sample.c
-│       ├── voltage_sample.h
-│       ├── llc_controller.c                     ← 数字电压环（2p2z）
-│       └── llc_controller.h
+│       ├── adc.c / adc.h                        ← ADC1 电压 + ADC2 电流，采样 12.5 周期
+│       ├── voltage_sample.c / voltage_sample.h  ← 电压换算（AMC1350，反相公式）
+│       ├── current_sample.c / current_sample.h  ← 电流换算（TMCS1101 ×2）
+│       ├── llc_ctrl.c / llc_ctrl.h              ← 数字电压环（2p2z + 软启动 + 过流锁存）
+│       └── (stm32g4xx_it.c / hrtim.c 见桌面 Keil 工程，HRTIM REP 中断做控制节拍)
 ├── control-loop/                                ← 控制环路设计
 │   ├── README.md                                ← 设计文档（模型推导+验证）
 │   ├── llc_loop_design.m                        ← MATLAB 设计脚本（可复现）

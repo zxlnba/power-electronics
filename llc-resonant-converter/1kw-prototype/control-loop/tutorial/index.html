@@ -258,7 +258,7 @@ fs = clamp(fr + w, 95k, 130k);   // 频率指令，带回钳位
       <p><code class="inline">x1, x2</code> 存的是历史误差与输出的加权记忆——它们让"积分"存在（这就是上一课那个积分在数字世界的落地）。<strong>clamp</strong> 是硬限制：95–130kHz，防止频率出界，也防止积分越积越大（抗饱和）。</p>
 
       <h3>6.3 系数怎么来</h3>
-      <p>这套系数（b0…a2）不是你手算的，是 <code class="inline">llc_loop_design.m</code> 自动算出来的：设计 C(s) → Tustin 离散 → 提取系数 → 写进 <code class="inline">llc_controller.h</code>。你要改的是参数（Lm、Co），不是系数。</p>
+      <p>这套系数（b0…a2）不是你手算的，是 <code class="inline">llc_loop_design.m</code> 自动算出来的：设计 C(s) → Tustin 离散 → 提取系数 → 写进 <code class="inline">llc_ctrl.h</code>。你要改的是参数（Lm、Co），不是系数。</p>
       <pre><code>#define LC_B0  -30456.16f
 #define LC_B1  -35.76f
 #define LC_B2  30420.40f

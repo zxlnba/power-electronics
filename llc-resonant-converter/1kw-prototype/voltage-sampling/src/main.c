@@ -16,7 +16,9 @@
 /* USER CODE BEGIN Includes */
 #include "adc.h"
 #include "voltage_sample.h"
+#include "current_sample.h"
 #include "OLED.h"
+#include "llc_ctrl.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -83,6 +85,7 @@ int main(void)
   MX_GPIO_Init();
   MX_HRTIM1_Init();
   MX_ADC1_Init();
+  MX_ADC2_Init();
 
   /* USER CODE BEGIN 2 */
   OLED_Init();
@@ -92,45 +95,97 @@ int main(void)
   vs_adc_startup_diag();
   /* 基线用固定值 VS_VCM_DEF，与上电顺序无关；VREFINT 每轮自动校准参考电压 */
 
+  /* 控制环初始化 */
+  llc_ctrl_init(&g_ctrl);
+  llc_ctrl_set_vref(&g_ctrl, 30.0f);   /* 低压测试：目标 ±30V/路（额定 200V 时改回 200.0f） */
+
+#if LLC_TEST_MODE_OPENLOOP_SWEEP
+  /* 开环频率扫描（极性验证）：从 130kHz 起步，main 里每 800ms 步进 */
+  llc_ctrl_set_fixed_fs(&g_ctrl, 130000.0f);
+#else
+  /* 正常运行：等自动软启动（LLC_START_DELAY_MS 后，见主循环）。
+     先开控制板 → 延时窗口内合母线 → 到时自动软启动。 */
+#endif
+
   OLED_ShowString(1, 1, "V+=");
   OLED_ShowString(2, 1, "V-=");
 
-  /* 启动互补输出 TD1 (PB14) 和 TD2 (PB15) */
+  /* 启动互补输出 TD1 (PB14) 和 TD2 (PB15)：初始 130kHz（最低增益），无母线时无功率。
+     软启动触发前已在 130kHz 就位，合母线即低压预充，浪涌最小。 */
   HAL_HRTIM_WaveformOutputStart(&hhrtim1, HRTIM_OUTPUT_TD1);
   HAL_HRTIM_WaveformOutputStart(&hhrtim1, HRTIM_OUTPUT_TD2);
-  /* 启动 Timer D 计数 */
+  /* 启动 Timer D 计数（REP 周期中断从此开始，每开关周期采样+控制） */
   HAL_HRTIM_WaveformCounterStart(&hhrtim1, HRTIM_TIMERID_TIMER_D);
   /* USER CODE END 2 */
 
   while (1)
   {
     /* USER CODE BEGIN 3 */
-    /* 每 100ms 采样 64 次平均，结果在 g_vpos / g_vneg（加平滑滤波压住显示跳动） */
+    /* 电流采样（ADC2）+ 过流判定。
+       ⚠️ 电压(ADC1) 由 REP 周期中断独占，主循环不要再访问 ADC1。 */
     static uint32_t s_tick = 0;
     if (HAL_GetTick() - s_tick > 100)
     {
       s_tick = HAL_GetTick();
-      float vp, vn;
-      if (vs_read_rails_avg(&vp, &vn, 64))
+      float i1, i2;
+      if (cur_read_avg(&i1, &i2, 16))
       {
-        /* 轻指数平滑：时间常数约0.3s，响应快又稳（供电稳定后可放宽） */
-        g_vpos = 0.7f * g_vpos + 0.3f * vp;
-        g_vneg = 0.7f * g_vneg + 0.3f * vn;
-      }    }
-    /* 每 500ms 刷新 OLED（标准显示）：
-       行1 V+=xxx  行2 V-=xxx  母线电压
-       行3 RAW=xxxx ADC原始值
-       行4 E<e> 错误码（0=正常） */
+        g_curr1 = 0.9f * g_curr1 + 0.1f * i1;   /* 轻平滑 */
+        g_curr2 = 0.9f * g_curr2 + 0.1f * i2;
+        if (g_curr1 > LC_OC_THRESH_A || g_curr2 > LC_OC_THRESH_A)
+          g_llc_fault = true;                   /* 置位后由 ISR 停止功率级并锁存 */
+      }
+    }
+
+#if !LLC_TEST_MODE_OPENLOOP_SWEEP
+    /* 软启动触发：延时到点自动启动；或调试器把 g_llc_start_req 置 1 立即启动 */
+    static uint8_t s_started = 0;
+    if (!s_started)
+    {
+      if (HAL_GetTick() > LLC_START_DELAY_MS || g_llc_start_req)
+      {
+        llc_ctrl_start(&g_ctrl);
+        s_started = 1;
+      }
+    }
+#else
+    /* 开环频率扫描（极性验证）：130k → 95k 步进，观察 vmeas 随 fs 下降而上升。
+       确认 fs↑⇒Vout↓（K_f<0）后，把 LLC_TEST_MODE_OPENLOOP_SWEEP 置 0 重编译进闭环。 */
+    static uint8_t  s_idx = 0;
+    static uint32_t s_sweep = 0;
+    const float sweep_fs[] = {130000, 125000, 120000, 115000, 110000, 107000, 104000, 100000, 95000};
+    if (HAL_GetTick() - s_sweep > 800)
+    {
+      s_sweep = HAL_GetTick();
+      if (s_idx < sizeof(sweep_fs)/sizeof(sweep_fs[0]))
+        llc_ctrl_set_fixed_fs(&g_ctrl, sweep_fs[s_idx++]);
+    }
+#endif
+
+    /* 每 500ms 刷新 OLED：
+       行1 V+=xxx  行2 V-=xxx（中断实时更新）
+       行3 I1=xxx I2=xxx  电流(A)
+       行4 状态：fs=xxxkHz（正常）或 FAULT OC（过流锁存） */
     static uint32_t s_oled = 0;
     if (HAL_GetTick() - s_oled > 500)
     {
       s_oled = HAL_GetTick();
       OLED_ShowFloatV(1, 4, g_vpos);
       OLED_ShowFloatV(2, 4, g_vneg);
-      OLED_ShowString(3, 1, "RAW=");
-      OLED_ShowNum(3, 5, g_raw_pos, 4);
-      OLED_ShowChar(4, 1, 'E');
-      OLED_ShowNum(4, 2, g_adc_error, 1);
+      OLED_ShowString(3, 1, "I1=");
+      OLED_ShowSignedNum(3, 4, (int32_t)g_curr1, 3);
+      OLED_ShowString(3, 8, "I2=");
+      OLED_ShowSignedNum(3, 11, (int32_t)g_curr2, 3);
+      if (g_llc_state == LLC_STATE_FAULT)
+      {
+        OLED_ShowString(4, 1, "FAULT OC");
+      }
+      else
+      {
+        OLED_ShowString(4, 1, "fs=");
+        OLED_ShowNum(4, 4, (uint32_t)(g_llc_fs_cmd / 1000.0f), 3);
+        OLED_ShowString(4, 8, "kHz");
+      }
     }
   }
   /* USER CODE END 3 */

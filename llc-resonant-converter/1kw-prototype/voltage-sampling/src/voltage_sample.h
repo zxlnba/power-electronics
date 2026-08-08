@@ -5,10 +5,10 @@
 #include <stdbool.h>
 
 /* ============ 采样链路参数（最终设计：串阻1k + 反馈7.5k） ============ */
-#define VS_ADC_VREF   3.3f     /* VDDA 满量程，须 >=3.15V */
+#define VS_ADC_VREF   3.3f     /* ADC 参考电压 = VDDA = 3.3V（标准） */
 #define VS_ADC_BITS   4096.0f  /* 12 位 ADC */
-#define VS_VCM_DEF    1.645f  /* 实测基线：0V输入VADC */   /* 实测基线：0V输入时VADC=2.0V */   /* 实测：次级5V实际4.58V → 4.58/3 */   /* VCM 理论值：5V x 10k/(20k+10k) */
-#define VS_K          0.0066f  /* 实测：(1.645-1.249)/60 */  /* 实测：0.037V/60V */  /* 实测：板子实际增益1.45倍 */  /* 灵敏度 V/V：G=0.68 x 0.4 x 0.02215 */
+#define VS_VCM_DEF    1.645f   /* 0V 输入时 VADC 基线（标准值） */
+#define VS_K          0.0066f  /* 灵敏度 V/V：实测 (1.645-1.249)/60 */
 
 /* ============ ADC 通道（按接线改） ============ */
 #define VS_CH_POS     ADC_CHANNEL_1   /* VADC1 -> PA0，正轨 +200V */
