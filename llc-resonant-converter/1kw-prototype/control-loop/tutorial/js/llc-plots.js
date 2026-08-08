@@ -25,6 +25,8 @@ const Plot = (function () {
   /* 坐标变换对象：
      linX / logX: 把数据坐标映射为像素；xPx: 反变换 */
   function lin(xMin, xMax, yMin, yMax, pad) {
+    if (!isFinite(pad.w) || !isFinite(pad.h))
+      throw new Error('Plot.lin: pad 缺少 w/h（需传 canvas 尺寸，见 setup 返回值）');
     return {
       pad,
       x: x => pad.l + (x - xMin) / (xMax - xMin) * (pad.w - pad.l),
@@ -34,6 +36,8 @@ const Plot = (function () {
     };
   }
   function log(xMin, xMax, yMin, yMax, pad) {
+    if (!isFinite(pad.w) || !isFinite(pad.h))
+      throw new Error('Plot.log: pad 缺少 w/h（需传 canvas 尺寸，见 setup 返回值）');
     const L0 = Math.log10(xMin), L1 = Math.log10(xMax);
     return {
       pad,
