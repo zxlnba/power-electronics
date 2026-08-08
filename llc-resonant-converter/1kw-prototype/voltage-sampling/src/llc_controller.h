@@ -5,10 +5,11 @@
   *
   *   被控对象（降阶模型，见 control-loop/llc_loop_design.m）：
   *     Gvd(s) = K_f*(1+s/wz_lm) / ((1+s/wp_out)*(1 + s/(wr*Qr) + s^2/wr^2))
-  *     满载工作点 fs=fr=107kHz：K_f = -0.535 V/kHz（fs↑则 Vout↓，反相）
+  *     fs=fr=107kHz 工作点：K_f = -0.748 V/kHz，与负载无关（fs↑则 Vout↓，反相）；
+  *     wp_out = 1/(Rload*Co) 随负载移动（轻载左移，裕度更好）
   *
   *   补偿器（Type II：积分 + 20Hz 零点 + 10kHz 高频极点）：
-  *     C(s) = K_c*(1+s/2pi/20) / (s*(1+s/2pi/10000)),  K_c = -2.3571e7
+  *     C(s) = K_c*(1+s/2pi/20) / (s*(1+s/2pi/10000)),  K_c = -1.6848e7
   *     穿越 fco≈2kHz，相位裕度 PM≈70°(含1拍延迟)，增益裕度 GM≈44dB
   *
   *   离散化：Tustin，控制率 = 每开关周期 (Ts = 1/fr = 9.349us)
@@ -27,9 +28,9 @@
 #include <stdbool.h>
 
 /* ============ 2p2z 系数（llc_loop_design.m 生成，勿手改） ============ */
-#define LC_B0  -42608.62147483f
-#define LC_B1  -50.02890368f
-#define LC_B2  42558.59257115f
+#define LC_B0  -30456.162712f
+#define LC_B1  -35.760097f
+#define LC_B2  30420.402615f
 #define LC_A1  -1.54594167f
 #define LC_A2  0.54594167f
 
