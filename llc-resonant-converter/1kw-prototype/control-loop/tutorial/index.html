@@ -280,9 +280,10 @@ fs = clamp(fr + w, 95k, 130k);   // 频率指令，带回钳位
         <tr><th>参数</th><th>值</th><th>参数</th><th>值</th></tr>
         <tr><td>输入 Vin</td><td class="num">360–440V</td><td>Lr</td><td class="num">270µH</td></tr>
         <tr><td>输出</td><td class="num">±200V / 各 500W</td><td>Cr</td><td class="num">8.2nF</td></tr>
-        <tr><td>变比 n</td><td class="num">2:1</td><td>Lm/Lr</td><td class="num">≈5（待实测）</td></tr>
+        <tr><td>变比 n（每路）</td><td class="num">2:1*</td><td>Lm/Lr</td><td class="num">≈5（待实测）</td></tr>
         <tr><td>fr</td><td class="num">107kHz</td><td>Co</td><td class="num">100µF/路（待确认）</td></tr>
       </table>
+      <p class="foot">*n 是<strong>每路</strong>变换比：原边 28T : 半绕组 14T。变压器<strong>全绕组 1:1</strong>（28T:28T，中心抽头分两个 14T 半绕组），400V 进 → 每路 200V，合计 400V 出。</p>
 
       <h3>7.2 生产线：从物理到系数</h3>
       <ol>
@@ -378,7 +379,7 @@ HRTIM1->sTimerxRegs[HRTIM_TIMERID_TIMER_D].CR2 |= HRTIM_CR2_SWU;
 
     <footer>
       本教学网站配套 <code class="inline">llc_loop_design.m</code> 与 <code class="inline">control-loop/README.md</code>。
-      所有数值基于 1kW 样机参数（Lr=270µH, Cr=8.2nF, n=2:1）。改参数请重跑 MATLAB 脚本。
+      所有数值基于 1kW 样机参数（Lr=270µH, Cr=8.2nF；n=2:1 为每路变换比，变压器全绕组 1:1 中心抽头）。改参数请重跑 MATLAB 脚本。
     </footer>
 
   </article>

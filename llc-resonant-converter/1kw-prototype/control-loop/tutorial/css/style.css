@@ -198,3 +198,10 @@ footer {
   .topbar { display: block; }
   main { padding: 20px 14px 80px; }
 }
+
+/* 表格脚注（*.foot：变比等标注的补充说明） */
+.foot {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 6px;
+}
