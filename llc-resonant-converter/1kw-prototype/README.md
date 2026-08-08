@@ -222,6 +222,27 @@ E:0             ← ADC 错误码 (0=正常)
 
 ---
 
+## 5. 数字控制环路设计
+
+样机的闭环调压采用 **PFM（变频）**：全桥固定 50% 占空比，通过 HRTIM TimerD 在
+95–130kHz 范围调整开关频率，改变谐振腔增益来稳定 ±200V 输出。已按数字电源标准
+流程完成 **环路建模 → 补偿器设计 → Tustin 离散化 → 闭环仿真**，2p2z 系数可直接
+落入固件。
+
+```
+Gvd(s) = K_f·(1+s/ωz_lm) / ((1+s/ωp_out)·(1+s/(ωr·Qr)+s²/ωr²))
+C(z)   = 2p2z，Ts = 1/fr = 9.35µs（每开关周期控制）
+指标：fco ≈ 2kHz，PM ≈ 70°（含 1 拍延迟），GM ≈ 44dB
+```
+
+详见 [`control-loop/`](./control-loop/)（设计推导 + MATLAB 脚本 + 闭环验证 + PLECS 验证步骤）
+
+> **⚠️ 关键设计发现**：满载下 FHA 增益峰值 M_max = 1.012，360V 输入需 M = 1.111，
+> **满载低输入时无法维持 ±200V**（输出随输入跌落），控制器会饱和到 fs_min。
+> 应对与后续优化见 [`control-loop/README.md`](./control-loop/README.md) §3。
+
+---
+
 ## 文件结构
 
 ```
@@ -237,7 +258,17 @@ E:0             ← ADC 错误码 (0=正常)
 │       ├── main.c / main.h
 │       ├── adc.c / adc.h
 │       ├── voltage_sample.c
-│       └── voltage_sample.h
+│       ├── voltage_sample.h
+│       ├── llc_controller.c                     ← 数字电压环（2p2z）
+│       └── llc_controller.h
+├── control-loop/                                ← 控制环路设计
+│   ├── README.md                                ← 设计文档（模型推导+验证）
+│   ├── llc_loop_design.m                        ← MATLAB 设计脚本（可复现）
+│   └── images/
+│       ├── fha-gain-curves.png
+│       ├── loop-bode.png
+│       ├── closed-loop-step.png
+│       └── fs-command.png
 └── images/                                      ← 图片目录（待补充）
     ├── schematic-overview.png
     ├── schematic-input-protection.png
