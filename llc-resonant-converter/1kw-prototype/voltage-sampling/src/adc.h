@@ -14,9 +14,11 @@ extern "C" {
 #include "main.h"
 
 extern ADC_HandleTypeDef hadc1;
+extern ADC_HandleTypeDef hadc2;
 extern volatile uint8_t g_adc_error;
 
 void MX_ADC1_Init(void);
+void MX_ADC2_Init(void);
 
 #ifdef __cplusplus
 }

@@ -1,7 +1,7 @@
 # LLC 数字电压环设计（1kW 样机）
 
 > 配套 MATLAB 脚本：[`llc_loop_design.m`](llc_loop_design.m) — 所有数值均可复现。
-> 固件实现：[`voltage-sampling/src/llc_controller.{h,c}`](../voltage-sampling/src/llc_controller.h)
+> 固件实现：[`voltage-sampling/src/llc_ctrl.{h,c}`](../voltage-sampling/src/llc_ctrl.h)
 
 ## 概述
 
@@ -190,7 +190,7 @@ fs  = clamp(fr + w, 95k, 130k)
 | a1 | -1.54594167 |
 | a2 | 0.54594167 |
 
-系数已写进 `voltage-sampling/src/llc_controller.h`，由 `llc_loop_design.m` 生成。
+系数已写进 `voltage-sampling/src/llc_ctrl.h`，由 `llc_loop_design.m` 生成。
 离散化引入的 1 拍计算延迟使 PM 从 80.4° 降到 70.5°（±10°），在可接受范围。
 
 > ⚠️ **2026-08 更正**：早期版本（aeb13cf）FHA 公式有误（`1/|1+((fn²-1)/fn)(1/(fn·m·Q)+j)|`
@@ -222,21 +222,26 @@ fs  = clamp(fr + w, 95k, 130k)
 ## 9. 固件集成（STM32G474 HRTIM）
 
 1. **采样**：AMC1350 差分 → 单端调理 → ADC。两路电压读数取幅值平均
-   `vmeas = (vp + |vn|)/2`，目标 200V。
-2. **控制率**：必须在开关周期中断里调用 `llc_ctrl_update()`（每 9.35µs），
-   不是 100ms 轮询。当前 `adc.c` 用 640 周期采样（≈60µs）——**必须缩短**到
-   ≤4.5µs 才能每开关周期闭环（见 §11）。
+   `vmeas = (vp + |vn|)/2`，目标 200V。**采样时间已从 640 周期(60µs) 缩短到
+   12.5 周期(~2.4µs)**，并在 HRTIM TimerD REP 周期中断内软件触发（周期边界、
+   相位锁定），每开关周期 9.35µs 可闭环（见 §11 与
+   [`scaled-low-voltage-test-plan.md`](./scaled-low-voltage-test-plan.md) §5）。
+2. **控制率**：在开关周期中断（HRTIM TimerD REP）里调用 `llc_ctrl_period_isr()`
+   （每 9.35µs），不是 100ms 轮询。`llc_ctrl_update()` 实现 2p2z。
 3. **频率写入**：`llc_apply_frequency(fs)` 把 fs 换算成 HRTIM TimerD 周期寄存器
-   并置 SWU：
+   并补写 CMP1xR 保 50% 占空比；预装载 + REP 更新事件生效（自带 1 拍延迟）：
 
    ```
    PER = HRTIM_CLK / fs   →  107kHz: 1588   95kHz: 1789   130kHz: 1307
-   HRTIM1->sTimerxRegs[HRTIM_TIMERID_TIMER_D].PERxR = per;
-   HRTIM1->sTimerxRegs[HRTIM_TIMERID_TIMER_D].CR2 |= HRTIM_CR2_SWU;
+   HRTIM1->sTimerxRegs[HRTIM_TIMERINDEX_TIMER_D].PERxR  = per;
+   HRTIM1->sTimerxRegs[HRTIM_TIMERINDEX_TIMER_D].CMP1xR = (per+1)>>1;
    ```
+   ⚠️ 修正了三处旧 `llc_controller.c` bug：`TIMERID`（MCR 掩码）当数组下标会越界、
+   `HRTIM_CR2_SWU` 宏不存在、只写 PER 丢 50% 占空比。
 
-4. **保护**：过流 > 3A 锁存，退到 fs_min（最大升压点），外部清零 enable 复位。
-5. **上电时序**：先开环固定 107kHz 软启动（限制 inrush），电压建立后再切入闭环。
+4. **保护**：过流 > 3A 锁存（`g_llc_fault`），REP 中断里停止 TimerD 计数与输出。
+5. **上电时序**：输出以 130kHz（最低增益）起步 → 2s 窗口合母线 → 软启动
+   130k→107k 斜坡 → 切入闭环（见 scaled-low-voltage-test-plan.md §4）。
 
 ---
 
@@ -263,7 +268,7 @@ fs  = clamp(fr + w, 95k, 130k)
 | 变比 n（每路） | 增益整体缩放 | 实测匝比（全绕组 1:1，每路 28:14） |
 | 整流管压降 | 低压满载时加剧跌落 | 满载 360V 实测 |
 
-改动任何一项：重跑 `llc_loop_design.m` → 更新 `llc_controller.h` 系数 →
+改动任何一项：重跑 `llc_loop_design.m` → 更新 `llc_ctrl.h` 系数 →
 PLECS 复验。
 
 ---

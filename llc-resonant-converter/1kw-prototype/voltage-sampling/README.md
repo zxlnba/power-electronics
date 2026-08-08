@@ -18,7 +18,7 @@
 | 采样范围 | ±200V DC |
 | ADC 分辨率 | 12-bit |
 | ADC 时钟 | SYSCLK / 16 = 10.6MHz |
-| 采样时间 | 640 周期 (60µs)，平均 LLC 开关纹波 |
+| 采样时间 | 12.5 周期 (~2.4µs)，供 HRTIM REP 周期中断每开关周期闭环 |
 | 基线 VCM | 1.645V（0V 输入时 VADC 实测值） |
 | 增益 K | 0.0066 V/V |
 | 参考电压 | VDDA = 3.3V |
@@ -56,12 +56,18 @@ voltage-sampling/
 ├── NEW YEAR.ioc              ← CubeMX 工程文件
 ├── README.md
 └── src/
-    ├── main.c                ← 主程序：OLED 显示、HRTIM 输出、采样循环
-    ├── adc.c / adc.h         ← ADC1 初始化（双通道顺序转换）
-    ├── voltage_sample.c      ← 采样核心：原始值读取、平均、电压换算
-    ├── voltage_sample.h      ← 采样参数宏定义
-    └── main.h                ← 外设句柄声明
+    ├── main.c / main.h       ← 主程序：OLED 显示、HRTIM 输出、自动软启动/开环扫描、过流判定
+    ├── adc.c / adc.h         ← ADC1 电压 + ADC2 电流（采样 12.5 周期）
+    ├── voltage_sample.c/.h   ← 电压换算（AMC1350，反相公式 Vrail=(VCM-VADC)/K）
+    ├── current_sample.c/.h   ← 电流换算（TMCS1101 ×2）
+    └── llc_ctrl.c / llc_ctrl.h ← 数字电压环：2p2z + 软启动状态机 + 过流锁存
+                                   （HRTIM TimerD REP 中断为控制节拍，每开关周期）
 ```
+
+> 实际 Keil 工程在 `D:\桌面\超级档案\voltage_sampling`（含 CubeMX 全套外设
+> hrtim.c / stm32g4xx_it.c / OLED.c 等）。本目录是固件源文件镜像，供仓库引用与
+> 版本管理。闭环固件详见
+> [`../control-loop/scaled-low-voltage-test-plan.md`](../control-loop/scaled-low-voltage-test-plan.md)。
 
 ## 调试与验证
 

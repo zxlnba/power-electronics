@@ -131,7 +131,7 @@ Ld = Cz_delay * Gvd_d;                 % 采样环路增益
 [b0,b1,b2,a1,a2] = disp2p2z(Cz);        % 由 C(z) 提取直接II型系数
 fprintf('===== 离散化（每开关周期 Ts=%.3f us） =====\n', Ts*1e6);
 fprintf('含1拍延迟: fco = %.0f Hz,  PM = %.1f deg\n', Wcpd/2/pi, Pmd);
-fprintf('\nfloat 系数（直接写进 llc_controller.h）:\n');
+fprintf('\nfloat 系数（直接写进 llc_ctrl.h）:\n');
 fprintf('  #define LC_B0  %.8ff\n', b0);
 fprintf('  #define LC_B1  %.8ff\n', b1);
 fprintf('  #define LC_B2  %.8ff\n', b2);
@@ -217,7 +217,7 @@ title(sprintf('变频指令 fs：%.0f~%.0f kHz', min(fs_cmd)/1e3, max(fs_cmd)/1e
 saveas(gcf, fullfile(figdir,'fs-command.png'));
 
 fprintf('图已保存到 %s\n', figdir);
-fprintf('\n下一步：把系数填进 llc_controller.h，在 PLECS 里对 Gvd 做 AC 扫描验证模型，\n');
+fprintf('\n下一步：把系数填进 llc_ctrl.h，在 PLECS 里对 Gvd 做 AC 扫描验证模型，\n');
 fprintf('再用控制回路库做闭环仿真，最后上真机。详见 control-loop/README.md\n');
 
 %% ============ 辅助函数 ============
