@@ -74,6 +74,19 @@ void MX_ADC1_Init(void)
     g_adc_error = 3;
     return; /* 通道2配置失败 */
   }
+
+  /* G4 ADC 校准（不可省）：之前"暂不校准"导致转换不稳定
+     （基线漂移、偶发第二次 EOC 不来）。流程：确保关闭→校准→完成。 */
+  if (ADC1->CR & ADC_CR_ADEN)
+  {
+    ADC1->CR |= ADC_CR_ADDIS;             /* 若残留使能先关闭 */
+    while (ADC1->CR & ADC_CR_ADEN) {}
+  }
+  if (HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED) != HAL_OK)
+  {
+    g_adc_error = 2;   /* 校准失败 */
+    return;
+  }
 }
 
 /* ADC2: 电流采样（TMCS1101 ×2）

@@ -33,11 +33,15 @@ volatile llc_state_t g_llc_state  = LLC_STATE_OPENLOOP;
 volatile float       g_llc_fs_cmd = LC_FS_MAX;
 volatile bool        g_llc_fault  = false;
 volatile bool        g_llc_start_req = false;
+volatile uint32_t    g_isr_cnt    = 0;    /* ISR 心跳计数（诊断：确认控制中断在跑） */
 
 llc_ctrl_t g_ctrl;
 
-/* ADC 快读超时保护（防死循环） */
-#define ADC_FAST_GUARD  10000
+/* ADC 快读超时保护（防死循环）。
+   实测 ADC 使能就绪后一次 2 通道转换 ~4μs，guard 正常只用几十次；
+   500 次 ≈ 18μs，即使 ADC 异常超时也不会饿死 REP 中断/主循环，
+   让 OLED 能显示 E=9/10 错误码。 */
+#define ADC_FAST_GUARD  500
 
 static float fclamp(float v, float lo, float hi)
 {
@@ -47,22 +51,162 @@ static float fclamp(float v, float lo, float hi)
 /* ADC1 顺序读两通道（正轨 PA0 / 负轨 PA1）。
    要求：ADC1 已使能（vs_adc_startup_diag 保证），扫描模式 2 转换，EOC_SINGLE。
    读 DR 自动清 EOC；带超时保护，超时置 g_adc_error 并返回 0。 */
-static void adc1_fast_read(uint16_t *c1, uint16_t *c2)
-{
-  uint32_t guard = ADC_FAST_GUARD;
-  ADC1->CR |= ADC_CR_ADSTART;
-  while ((ADC1->ISR & ADC_ISR_EOC) == 0)
-  {
-    if (--guard == 0) { g_adc_error = 9; *c1 = 0; *c2 = 0; return; }
-  }
-  *c1 = (uint16_t)ADC1->DR;
+/* ADC1 单通道交替采样（无忙等）。
+   根因：扫描模式 2 通道一次 ADSTART 连续转完，ch2 完成时 ch1 的 DR 未读
+   → OVR 置位 → G4 中 OVR 挂起时 EOC 不再置位 → 永远读不到（V=0）。
+   对策：每次 REP 只触发单通道，下周期进 ISR 时必已转完，读 DR + 清 OVR
+   + 切另一通道触发。单转换无覆盖、无 OVR、无忙等，ISR 恒短。
+   ⚠️ G4 SQR1 布局（用 LL 头核对过）：L[3:0] 在 bit0-3，SQ1[4:0] 在 bit6-10，
+   SQ2 在 bit12-16。别把 L 当高字段写——写 0x1 等于 L=1 仍是双通道扫描！
 
-  guard = ADC_FAST_GUARD;
-  while ((ADC1->ISR & ADC_ISR_EOC) == 0)
+   三通道轮询：PA0(正) → PA1(负) → VREFINT(内部基准)。每 3 个 REP 一轮。
+   读数 = VREFINT 归一化（见 llc_ctrl_period_isr）：VADC = counts×g_vref/4096，
+   g_vref 精确跟踪 VDDA（出厂标定与实测同载 VREFINT，ratio 抵消容差）
+   → 参考漂移/抖动不影响读数；零点=固定 VS_VCM_DEF=1.627V（不抓基线）。 */
+#define ADC1_SQR1_SINGLE_CH1   (1U << 6)    /* CH1 = PA0 正轨 */
+#define ADC1_SQR1_SINGLE_CH2   (2U << 6)    /* CH2 = PA1 负轨 */
+#define ADC1_SQR1_SINGLE_VREF  (18U << 6)   /* CH18 = VREFINT 内部基准 */
+
+/* VREFINT 工厂校准值：VREF+ = 3.0V 条件下测得的 VREFINT 12 位 ADC 原始值（存 Flash 0x1FFF75AA） */
+#define VREFINT_CAL_VAL   ((uint16_t)(*((volatile uint16_t*)0x1FFF75AAUL)))
+
+static uint8_t s_adc_ch_sel = 0;   /* 0=上周期采PA0 1=上周期采PA1 2=上周期采VREFINT */
+float g_vref_volts = 3.16f;        /* VREFINT 跟踪的 VDDA（0.9s 平均+低通），读数归一化用 */
+uint16_t g_base_pos_c = 0;         /* 上电基线 PA0 counts（诊断：OLED 显示，定位读数偏移源） */
+uint16_t g_base_neg_c = 0;
+
+/* 信号通道平滑：指数低通 α=1/16（压显示抖动；尖峰由显示侧 344ms 低通吸收）。
+   初值=上电基线仅作起步（0.5ms 内自收敛到真实值，不影响稳态）。
+   ⚠️ 已删除突变拒绝：它会把错误基线锁死成永久零位（曾 0V 永久读几十V、
+   每次上电不同），且会拒绝真实的快速电压变化。
+   VREFINT 32 次累加平均 + 0.25 低通 → g_vref_volts（进读数归一化，见 period_isr）。 */
+static uint16_t s_pos_sm  = 0;     /* PA0 counts 平滑值（初值=上电基线） */
+static uint16_t s_neg_sm  = 0;     /* PA1 counts 平滑值 */
+static float   s_base_pos_v = 0.0f;  /* 读数零点 VADC(V)：起点 1.627V，0V 门内慢速校零修正 */
+static float   s_base_neg_v = 0.0f;
+static float   s_vp_disp = 0.0f;     /* 显示慢低通状态（344ms 时间常数） */
+static float   s_vn_disp = 0.0f;
+static float   s_vm_gate = 0.0f;     /* 校零门：|vmeas| 慢平均（τ≈53ms），0V 恒开/出压即关 */
+#define DISP_LP_N  32768.0f          /* α=1/N per REP → 95kHz/32768≈344ms */
+#define REZERO_N     50000.0f        /* 校零低通：α=1/N per REP → τ≈0.5s，无跳变 */
+#define REZERO_AVG_N  5000.0f        /* 校零门平均：α=1/N → τ≈53ms */
+#define REZERO_GATE_V 0.5f           /* |vmeas|<0.5V → 两路都在 0V，允许校零 */
+static uint32_t s_vref_acc = 0;    /* VREFINT counts 累加器 */
+static uint16_t s_vref_cnt = 0;    /* VREFINT 已累加样本数 */
+#define VREF_AVG_N  32             /* 32×~31.6μs≈1ms 平均一次 */
+#define BL_N_SAMP   16             /* 基线每通道有效采样数 */
+
+static void adc1_sample_isr(void)
+{
+  uint32_t isr;
+  uint16_t d;
+
+  if (!(ADC1->CR & ADC_CR_ADEN))   /* ADC 未使能：直接报错，不触发 */
   {
-    if (--guard == 0) { g_adc_error = 10; *c2 = 0; return; }
+    g_adc_error = 20;
+    return;
   }
-  *c2 = (uint16_t)ADC1->DR;
+
+  isr = ADC1->ISR;
+  if (isr & ADC_ISR_EOC)           /* 上一周期触发的单通道转换已完成 */
+  {
+    d = (uint16_t)ADC1->DR;
+    if (s_adc_ch_sel == 0)      /* 上一周期采 PA0：α=1/16 低通 */
+    {
+      if (s_pos_sm == 0U) s_pos_sm = d;
+      else s_pos_sm = (uint16_t)(((uint32_t)s_pos_sm * 15U + d) / 16U);
+      g_raw_pos = s_pos_sm;
+    }
+    else if (s_adc_ch_sel == 1) /* 上一周期采 PA1 */
+    {
+      if (s_neg_sm == 0U) s_neg_sm = d;
+      else s_neg_sm = (uint16_t)(((uint32_t)s_neg_sm * 15U + d) / 16U);
+      g_raw_neg = s_neg_sm;
+    }
+    else if (d > 100U)   /* 上一周期采 VREFINT：32 次累加平均 + 0.25 低通 → g_vref_volts（VDDA 跟踪） */
+    {
+      s_vref_acc += d;
+      if (++s_vref_cnt >= VREF_AVG_N)
+      {
+        uint16_t avg = (uint16_t)(s_vref_acc / VREF_AVG_N);
+        s_vref_acc = 0; s_vref_cnt = 0;
+        float g_new = 3.0f * VREFINT_CAL_VAL / (float)avg;
+        g_vref_volts += 0.25f * (g_new - g_vref_volts);   /* 低通：抑归一化步进，读数不跳 */
+        if (g_vref_volts < 2.5f || g_vref_volts > 4.0f) g_vref_volts = VS_ADC_VREF;
+      }
+    }
+  }
+
+  ADC1->ISR = ADC_ISR_EOC | ADC_ISR_OVR;   /* 清标志（含 OVR，防抑制 EOC） */
+
+  /* 轮询下一通道 */
+  s_adc_ch_sel = (s_adc_ch_sel + 1) % 3;
+  switch (s_adc_ch_sel)
+  {
+    case 0:  ADC1->SQR1 = ADC1_SQR1_SINGLE_CH1;  break;  /* 触发 PA0 */
+    case 1:  ADC1->SQR1 = ADC1_SQR1_SINGLE_CH2;  break;  /* 触发 PA1 */
+    default: ADC1->SQR1 = ADC1_SQR1_SINGLE_VREF; break;  /* 触发 VREFINT */
+  }
+  ADC1->CR |= ADC_CR_ADSTART;
+}
+
+/* 阻塞读当前通道 nsamp 次（先去 3 次弃采样等 ADC 稳定），去最大最小后平均，返回 counts。
+   spread 可选：返回 nsamp 内 max−min（输入未稳定/悬空时会很大）。 */
+static uint16_t adc_block_read_avg(uint32_t nsamp, uint16_t *spread)
+{
+  uint32_t sum = 0, t;
+  uint16_t mn = 0xFFFF, mx = 0, v;
+  int i;
+
+  for (i = 0; i < 3; i++)                 /* 弃采样：等 ADC 稳定 */
+  {
+    ADC1->ISR = ADC_ISR_EOC | ADC_ISR_OVR;
+    ADC1->CR |= ADC_CR_ADSTART;
+    t = 0;
+    while (!(ADC1->ISR & ADC_ISR_EOC)) { if (++t > 200000U) break; }
+    (void)ADC1->DR;
+  }
+  for (i = 0; i < (int)nsamp; i++)
+  {
+    ADC1->ISR = ADC_ISR_EOC | ADC_ISR_OVR;
+    ADC1->CR |= ADC_CR_ADSTART;
+    t = 0;
+    while (!(ADC1->ISR & ADC_ISR_EOC)) { if (++t > 200000U) break; }
+    v = (uint16_t)ADC1->DR;
+    if (v < mn) mn = v;
+    if (v > mx) mx = v;
+    sum += v;
+  }
+  if (spread) *spread = (uint16_t)(mx - mn);
+  return (uint16_t)((sum - mn - mx) / (nsamp - 2));
+}
+
+/* 零点=固定标定 VCM（用户定 VS_VCM_DEF=1.627V），读数直接减它。
+   抓取的 PA0/PA1 计数仅作平滑起步（0.5ms 自收敛）与诊断显示（B=），不作零点。
+   平滑为纯指数低通（无突变拒绝，防锁死）；异常抓取值回退名义值。 */
+static void adc_capture_baseline(void)
+{
+  uint16_t base_pos, base_neg, spread;
+  uint16_t nominal = (uint16_t)(VS_VCM_DEF * VS_ADC_BITS / VS_ADC_VREF);
+
+  ADC1->SQR1 = ADC1_SQR1_SINGLE_CH1;
+  base_pos = adc_block_read_avg(BL_N_SAMP, &spread);
+  if (base_pos < 1500U || base_pos > 3400U || spread > 25U) base_pos = nominal;
+
+  ADC1->SQR1 = ADC1_SQR1_SINGLE_CH2;
+  base_neg = adc_block_read_avg(BL_N_SAMP, &spread);
+  if (base_neg < 1500U || base_neg > 3400U || spread > 25U) base_neg = nominal;
+
+  s_pos_sm = base_pos;               /* 平滑初值（仅起步，0.5ms 自收敛） */
+  s_neg_sm = base_neg;
+  g_base_pos_c = base_pos;           /* 诊断暴露 */
+  g_base_neg_c = base_neg;
+
+  s_base_pos_v = VS_VCM_DEF;         /* 零点=固定 1.627V */
+  s_base_neg_v = VS_VCM_DEF;
+
+  ADC1->ISR = ADC_ISR_EOC | ADC_ISR_OVR;
+  s_adc_ch_sel = 0;
 }
 
 /* 过流/故障：停止 HRTIM TimerD 计数与 TD1/TD2 输出。
@@ -105,6 +249,22 @@ void llc_ctrl_init(llc_ctrl_t *c)
     ADC1->ISR = ADC_ISR_ADRDY;
     ADC1->CR |= ADC_CR_ADEN;
   }
+
+  /* VREFINT 动态标定前置（否则动态标定算出的参考错误 → 读数整体偏移）：
+     ① ADC_CCR.VREFEN 必须置位，CH18 才真正连到 VREFINT 内部基准；
+        工程原无任何 VREFEN 使能 → CH18 读到浮空杂散值（~1342 counts）
+        → vref 被算成 ~3.7V → 0V 输入显示 -40V。这是本版根因。
+     ② CH18 采样时间 12.5cyc(1.18μs) 不足，VREFINT 源阻抗高采不满 → 提到 47.5cyc(4.48μs)。
+        转换总时长 47.5+12.5=60cyc≈5.66μs < REP 周期 9.3μs，时序安全。
+        此刻 HRTIM 未启动、无转换在进行，写 CCR/SMPR2 安全。 */
+  ADC12_COMMON->CCR |= ADC_CCR_VREFEN;   /* VREFEN 在 ADC12_COMMON（双 ADC 公共块），不是 ADC1->CCR */
+  ADC1->SMPR2 = (ADC1->SMPR2 & ~ADC_SMPR2_SMP18_Msk)
+              | ADC_SMPR2_SMP18_2;   /* CH18 47.5 cycles（G4 编码 0b100） */
+
+  /* 上电抓取 PA0/PA1 计数：此刻 HRTIM 未启动、无 REP 抢占，阻塞读安全。
+     两路输入必为 0V（未合母线）。结果仅作平滑初值 + B= 诊断显示；
+     读数零点=固定 VS_VCM_DEF=1.627V，不依赖本次抓取（前端建立时间不定）。 */
+  adc_capture_baseline();
 }
 
 void llc_ctrl_set_vref(llc_ctrl_t *c, float v)   { c->vref = v; }
@@ -176,18 +336,42 @@ uint32_t llc_apply_frequency(float fs)
 void llc_ctrl_period_isr(void)
 {
   llc_ctrl_t *c = &g_ctrl;
-  uint16_t c1, c2;
   float vp, vn, vmeas;
+  g_isr_cnt++;
 
-  /* 1. 电压采样（ADC1）——采样时刻=周期边界，相位锁定，无纹波拍频 */
-  adc1_fast_read(&c1, &c2);
-  g_raw_pos = c1;
-  g_raw_neg = c2;
-  vp = vs_rail_voltage(VS_VCM_DEF, c1);   /* 正轨（带符号，如 +30） */
-  vn = vs_rail_voltage(VS_VCM_DEF, c2);   /* 负轨（带符号，如 -30） */
-  g_vpos = vp;
-  g_vneg = vn;
-  vmeas = (vp - vn) * 0.5f;               /* (vp + |vn|)/2 = 幅值平均 */
+  /* 电压采样（无忙等版）：读上一周期结果 + 触发本周期转换。
+     VREFINT 对照诊断已证实 ADC 转换链路健康（CV 稳定），
+     主循环读会被 REP 抢占→OVR→EOC 丢失，故必须 ISR 内采样。 */
+  adc1_sample_isr();
+
+  /* 电压换算（VREFINT 归一化 + 0V 慢速校零零点，2026-08-10 定论改版）：
+     VADC = counts × g_vref/4096，g_vref = 3.0×VREFINT_CAL/VREFINT_counts
+     —— 精确跟踪 VDDA：出厂标定与实测同载 VREFINT，ratio 抵消 ±1% 容差，
+        参考漂移/抖动自动消除（实测：固定参考在 VDDA 抖 ±0.3% 时读数跳 0.8V，归一化后根除）。
+     Vrail = (零点 − 当前VADC)/K。零点起点 VS_VCM_DEF=1.627V，但前端共模逐次上电
+     会漂（实测 1.621~1.627，还出现过 2.15V），固定值追不上 → 由下方"0V 慢速校零"
+     在确认 0V 时拉向当前真实共模。 */
+  vp = (s_base_pos_v - (float)g_raw_pos * g_vref_volts / VS_ADC_BITS) / VS_K_POS;
+  vn = (s_base_neg_v - (float)g_raw_neg * g_vref_volts / VS_ADC_BITS) / VS_K_NEG;
+  vmeas = (vp - vn) * 0.5f;   /* 控制用快速测量（闭环阶段另行设计滤波器带宽） */
+
+  /* 0V 慢速校零：门控 = |vmeas| 慢平均 < 0.5V。vmeas=(vp−vn)/2 中零点偏移精确抵消，
+     故 0V 时门恒开（即使显示偏 ~1V）、一有输出电压立即关。门内把零点慢速拉向
+     当前 VADC（=当前真实共模），τ≈0.5s 无跳变，多次读数平均掉噪声。前端共模漂移
+     （逐次上电/起步/热漂）由此跟随；一出压即冻结不再动。 */
+  s_vm_gate += (vmeas - s_vm_gate) * (1.0f / REZERO_AVG_N);
+  if (s_vm_gate < REZERO_GATE_V && s_vm_gate > -REZERO_GATE_V)
+  {
+    s_base_pos_v += ((float)g_raw_pos * g_vref_volts / VS_ADC_BITS - s_base_pos_v) * (1.0f / REZERO_N);
+    s_base_neg_v += ((float)g_raw_neg * g_vref_volts / VS_ADC_BITS - s_base_neg_v) * (1.0f / REZERO_N);
+  }
+
+  /* 显示慢低通：剩余 ±1V 是 >10Hz 测量噪声（万用表稳、ADC 跳——表内部积分把快噪声
+     平均掉，ADC 31kHz 采样没平均）。参考归一化治不了它（噪声真实落在 counts 里），
+     只能靠显示侧滤波。α=1/32768 per REP ≈ 344ms 时间常数：
+     50Hz 噪声压 ~108×、100Hz ~216× → ±1V → ±0.01V；真实变化 ~1.6s 内跟上，与表一致。 */
+  g_vpos = s_vp_disp += (vp - s_vp_disp) * (1.0f / DISP_LP_N);
+  g_vneg = s_vn_disp += (vn - s_vn_disp) * (1.0f / DISP_LP_N);
 
   /* 2. 过流/故障检查（g_llc_fault 由 main 主循环按电流判定） */
   if (g_llc_fault && c->state != LLC_STATE_FAULT)

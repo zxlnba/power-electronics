@@ -69,6 +69,14 @@ float vs_rail_voltage(float baseline_volts, uint16_t counts)
     return (baseline_volts - vadc) / VS_K;   /* 反相：Vrail = (VCM - VADC)/K */
 }
 
+/* vref_volts = 当前参考电压（诊断当前固定用 VS_ADC_VREF=3.183）；
+   k = 该通道灵敏度（分通道，见 VS_K_POS/VS_K_NEG）。 */
+float vs_rail_voltage_vref(float baseline_volts, uint16_t counts, float vref_volts, float k)
+{
+    float vadc = (float)counts * vref_volts / VS_ADC_BITS;
+    return (baseline_volts - vadc) / k;   /* 反相：Vrail = (VCM - VADC)/K */
+}
+
 bool vs_init(void)
 {
     return true;
@@ -78,15 +86,27 @@ bool vs_init(void)
    若 HAL Start 因 1ms ADRDY 超时失败，手动等就绪后重试一次。 */
 static bool vs_read_counts(uint16_t *c1, uint16_t *c2)
 {
+    /* 清残留 EOC/OVR 标志：上次 OVR 残留会阻断下次 EOC（第二次转换超时的元凶） */
+    ADC1->ISR = ADC_ISR_EOC | ADC_ISR_OVR;
+
     if (HAL_ADC_Start(&hadc1) != HAL_OK)
     {
         /* Start 失败=ADRDY 超时。多半是 HAL 1ms 超时太紧，手动等就绪后重试 */
         vs_manual_adc_ready(NULL);
         if (HAL_ADC_Start(&hadc1) != HAL_OK) { g_adc_error = 6; return false; }
     }
-    if (HAL_ADC_PollForConversion(&hadc1, 100) != HAL_OK) { HAL_ADC_Stop(&hadc1); g_adc_error = 7; return false; }
+    /* 超时细分：OVR 置位=数据覆盖（读太慢/转换太快），否则=纯超时 */
+    if (HAL_ADC_PollForConversion(&hadc1, 100) != HAL_OK)
+    {
+        g_adc_error = (ADC1->ISR & ADC_ISR_OVR) ? 11 : 7;
+        HAL_ADC_Stop(&hadc1); return false;
+    }
     *c1 = HAL_ADC_GetValue(&hadc1);
-    if (HAL_ADC_PollForConversion(&hadc1, 100) != HAL_OK) { HAL_ADC_Stop(&hadc1); g_adc_error = 8; return false; }
+    if (HAL_ADC_PollForConversion(&hadc1, 100) != HAL_OK)
+    {
+        g_adc_error = (ADC1->ISR & ADC_ISR_OVR) ? 12 : 8;
+        HAL_ADC_Stop(&hadc1); return false;
+    }
     *c2 = HAL_ADC_GetValue(&hadc1);
     HAL_ADC_Stop(&hadc1);
     g_adc_error = 0;

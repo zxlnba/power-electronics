@@ -135,6 +135,13 @@ Vrail = (Vin / 2) × M(fn, Q)        M ∈ [0.9, 1.05]（95–130kHz 频带内�
 > 不依赖 HRTIM 硬件 ADC 触发（本工程 HAL 版本较旧，缺 `ADC_EXTERNALTRIGINJEC_HRTIM_TRG2`），
 > 在中断里软件触发等效实现相位锁定，且对 HAL 版本无要求。
 
+> **2026-08-10 测量精确化（已落地，见 `voltage-sampling/README.md` 与 `调试日志/`）**：
+> 电压采样已从"每 REP 双通道连续转"改为 **单通道交替采样**（PA0→PA1→VREFINT 每 3 REP 一轮，
+> 每周期只触发 1 通道、读 DR + 清 OVR + 切通道），消除了扫描模式 OVR 挂起抑制 EOC 导致
+> 电压恒 0 的问题；读数用 **VREFINT 归一化**（`g_vref=3.0×VREFINT_CAL/VREFINT_counts`）跟踪
+> VDDA 漂移/抖动；零点用 **0V 慢速校零**（`|vmeas|<0.5V` 时慢速拉向当前真实共模，τ≈0.5s）。
+> 本表"相位锁定"结论不受影响（采样仍在 REP 中断内开关周期边界完成）。
+
 ---
 
 ## 6. 闭环程序结构与文件改动
