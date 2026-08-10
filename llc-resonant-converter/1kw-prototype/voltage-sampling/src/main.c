@@ -93,7 +93,8 @@ int main(void)
 
   /* ADC 启动诊断：确保 ADC 就绪（也规避 HAL 1ms 超时），保持使能 */
   vs_adc_startup_diag();
-  /* 基线用固定值 VS_VCM_DEF，与上电顺序无关；VREFINT 每轮自动校准参考电压 */
+  /* 电压零点起点 VS_VCM_DEF，由 llc_ctrl.c 的"0V 慢速校零"在确认两路 0V 时
+     自动修正到当前真实前端共模；VREFINT 归一化跟踪 VDDA（见 llc_ctrl_period_isr） */
 
   /* 控制环初始化 */
   llc_ctrl_init(&g_ctrl);
@@ -114,8 +115,11 @@ int main(void)
      软启动触发前已在 130kHz 就位，合母线即低压预充，浪涌最小。 */
   HAL_HRTIM_WaveformOutputStart(&hhrtim1, HRTIM_OUTPUT_TD1);
   HAL_HRTIM_WaveformOutputStart(&hhrtim1, HRTIM_OUTPUT_TD2);
-  /* 启动 Timer D 计数（REP 周期中断从此开始，每开关周期采样+控制） */
-  HAL_HRTIM_WaveformCounterStart(&hhrtim1, HRTIM_TIMERID_TIMER_D);
+  /* 启动 Timer D 计数 + REP 周期中断（每开关周期采样+控制）。
+     ⚠️ 必须用 *_IT 版：旧名 WaveformCounterStart 经 legacy 宏映射到不带中断的
+     WaveformCountStart，只 MCR|=TDEN 启动计数，不写 REPIE → ISR 永不触发，
+     g_raw_pos/neg 永不更新 → 电压恒 0000。 */
+  HAL_HRTIM_WaveformCountStart_IT(&hhrtim1, HRTIM_TIMERID_TIMER_D);
   /* USER CODE END 2 */
 
   while (1)
@@ -170,6 +174,7 @@ int main(void)
     if (HAL_GetTick() - s_oled > 500)
     {
       s_oled = HAL_GetTick();
+      NVIC_DisableIRQ(HRTIM1_TIMD_IRQn);   /* 保护软件 I2C 位时序（REP 中断 95kHz） */
       OLED_ShowFloatV(1, 4, g_vpos);
       OLED_ShowFloatV(2, 4, g_vneg);
       OLED_ShowString(3, 1, "I1=");
@@ -186,6 +191,7 @@ int main(void)
         OLED_ShowNum(4, 4, (uint32_t)(g_llc_fs_cmd / 1000.0f), 3);
         OLED_ShowString(4, 8, "kHz");
       }
+      NVIC_EnableIRQ(HRTIM1_TIMD_IRQn);   /* 恢复 REP 中断（刷新期间已屏蔽） */
     }
   }
   /* USER CODE END 3 */
