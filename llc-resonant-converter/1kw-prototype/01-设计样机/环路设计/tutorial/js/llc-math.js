@@ -1,6 +1,6 @@
 /* llc-math.js — 环路学习网站的数学引擎（零依赖）
  * 复数运算 / 极零点频响 / FHA 增益 / 矩阵指数 / 2p2z 离散闭环仿真
- * 参数全部来自 1kW 样机（control-loop/llc_loop_design.m）
+ * 参数全部来自 1kW 样机（环路设计/llc_loop_design.m）
  */
 'use strict';
 

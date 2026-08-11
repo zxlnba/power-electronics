@@ -44,8 +44,8 @@ CubeMX 生成的 PLL + 同步时钟配置导致 ADRDY 不置位，HAL 1ms 超时
 ### 2026-08-10 测量精确化（读数准确稳定 ±0.1V）
 
 把电压读数从"能动"追到"准确稳定"的完整过程记录在
-[`../../docs/调试日志/电压采样板调试全流程日志.md`](../../docs/调试日志/电压采样板调试全流程日志.md)
-与 [`../../docs/调试日志/00_ADC电压显示调试记录.docx`](../../docs/调试日志/00_ADC电压显示调试记录.docx)。要点：
+[`调试日志/电压采样板调试全流程日志.md`](./调试日志/电压采样板调试全流程日志.md)
+与 [`调试日志/00_ADC电压显示调试记录.docx`](./调试日志/00_ADC电压显示调试记录.docx)。要点：
 
 1. **单通道交替采样（核心修复）**：扫描模式 2 通道一次 ADSTART 连续转完，ch2 完成时
    ch1 的 DR 未读 → OVR 置位 → G4 中 OVR 挂起时 EOC 不再置位 → 永远读不到（V 恒 0000）。
@@ -76,22 +76,23 @@ CubeMX 生成的 PLL + 同步时钟配置导致 ADRDY 不置位，HAL 1ms 超时
 ## 软件结构
 
 ```
-voltage-sampling/
+03-调试代码/
 ├── llc_board.ioc             ← CubeMX 工程文件
 ├── README.md
-└── src/
-    ├── main.c / main.h       ← 主程序：OLED 显示、HRTIM 输出、自动软启动/开环扫描、过流判定
-    ├── adc.c / adc.h         ← ADC1 电压 + ADC2 电流（采样 12.5 周期）
-    ├── voltage_sample.c/.h   ← 电压换算（AMC1350，反相公式 Vrail=(VCM-VADC)/K）
-    ├── current_sample.c/.h   ← 电流换算（TMCS1101 ×2）
-    └── llc_ctrl.c / llc_ctrl.h ← 数字电压环：2p2z + 软启动状态机 + 过流锁存
+├── src/
+│   ├── main.c / main.h       ← 主程序：OLED 显示、HRTIM 输出、自动软启动/开环扫描、过流判定
+│   ├── adc.c / adc.h         ← ADC1 电压 + ADC2 电流（采样 12.5 周期）
+│   ├── voltage_sample.c/.h   ← 电压换算（AMC1350，反相公式 Vrail=(VCM-VADC)/K）
+│   ├── current_sample.c/.h   ← 电流换算（TMCS1101 ×2）
+│   └── llc_ctrl.c / llc_ctrl.h ← 数字电压环：2p2z + 软启动状态机 + 过流锁存
                                    （HRTIM TimerD REP 中断为控制节拍，每开关周期）
+└── 调试日志/                  ← ADC 排障 + 采样板调试全流程
 ```
 
 > 实际 Keil 工程在 `D:\桌面\超级档案\voltage_sampling`（含 CubeMX 全套外设
 > hrtim.c / stm32g4xx_it.c / OLED.c 等）。本目录是固件源文件镜像，供仓库引用与
-> 版本管理。闭环固件详见
-> [`../control-loop/scaled-low-voltage-test-plan.md`](../control-loop/scaled-low-voltage-test-plan.md)。
+> 版本管理。闭环固件测试方案详见
+> [`../04-60V缩尺300W/scaled-low-voltage-test-plan.md`](../04-60V缩尺300W/scaled-low-voltage-test-plan.md)。
 
 ## 调试与验证
 

@@ -28,18 +28,24 @@ llc-resonant-converter/
 │   ├── simulation/  (×9 .plecs)
 │   └── images/      (待补充)
 └── 1kw-prototype/
-    ├── README.md                       ← 样机详解 + 当前状态
-    ├── docs/                           ← 工程文档集中目录
-    │   ├── 工程开发文档.md              ← 🔥 完整工程开发记录（60V 教训 + 改腔方案）
+    ├── README.md                       ← 开发逻辑导航（4 章 + 当前状态）
+    ├── 01-设计样机/                    ← ① 1kW 设计和样机（驱动板/采样板/主功率板）
+    │   ├── README.md                   ← 三块板设计总览
+    │   ├── 工程开发文档.md              ← 🔥 完整工程开发记录（60V 教训 + 60V 专用腔设计）
     │   ├── 1kW高压隔离LLC变换器原理图说明.docx
-    │   ├── 缩尺方案与闭环固件测试报告.docx
-    │   └── 调试日志/  (ADC 排障 + 采样板全流程)
-    ├── pcb/
-    │   └── Gerber_PCB1_2026-07-31.zip
-    ├── voltage-sampling/
+    │   ├── 电压采样电路设计分析与计算.docx
+    │   └── 环路设计/                   ← 数字电压环设计（MATLAB + 交互教程）
+    ├── 02-PCB/                         ← ② PCB（三块板 Gerber / 工程文件）
+    │   ├── 驱动板/
+    │   ├── 采样板/
+    │   └── 主功率板/
+    ├── 03-调试代码/                    ← ③ 调试代码（采样固件 + 调试日志）
     │   ├── README.md
     │   ├── llc_board.ioc
     │   └── src/  (×6 .c/.h)
-    ├── control-loop/                   ← 环路设计 + 理论仿真（MATLAB ×4）
+    ├── 04-60V缩尺300W/                 ← ④ 1kW 缩尺成 60V/300W（方案A 设计 + 测试计划）
+    │   ├── README.md                   ← ★ 60V 缩尺设计完整说明
+    │   ├── llc_rescale.m / llc_theory.m / llc_sim.m
+    │   └── scaled-low-voltage-test-plan.md
     └── images/      (待补充)
 ```

@@ -9,7 +9,7 @@
 % 用法：MATLAB 下直接运行，或
 %       matlab -batch "llc_loop_design"
 % 依赖：Control System Toolbox（tf/bode/c2d）
-% 输出：console 打印全部设计值 + control-loop/images/ 下 4 张图 + 系数文件
+% 输出：console 打印全部设计值 + images/ 下 4 张图 + 系数文件
 %
 % 设计参数（参数作品设计书 §3.2，1kW 权威值）：
 %   k = Lm/Lr = 7.4，Lm = k·Lr ≈ 2.0mH，Lr=270uH，Cr=8.2nF，fr=107kHz，n=2（每路 28:14）
@@ -22,7 +22,7 @@
 %   若按功率守恒折算 Rac' = V1rms²/P = 129.7Ω，等效 Q ≈ 1.4 = 0.35×4（差 4 倍源于 n²）。
 %   K_f 与 2p2z 系数只依赖 m 与输出极点 fp_out，与 Q 无关 —— 固件系数不受 Q 口径影响。
 %   增益曲线/升压裕量按设计书 Q=0.35 绘图；60V 重载分析用功率守恒口径（见
-%   ../docs/工程开发文档.md），60V 负载换算 Q 远超 0.35，结论一致。
+%   ../工程开发文档.md），60V 负载换算 Q 远超 0.35，结论一致。
 
 clear; clc; close all;
 
@@ -238,7 +238,7 @@ saveas(gcf, fullfile(figdir,'fs-command.png'));
 
 fprintf('图已保存到 %s\n', figdir);
 fprintf('\n下一步：把系数填进 llc_ctrl.h，在 PLECS 里对 Gvd 做 AC 扫描验证模型，\n');
-fprintf('再用控制回路库做闭环仿真，最后上真机。详见 control-loop/README.md\n');
+fprintf('再用控制回路库做闭环仿真，最后上真机。详见环路设计/README.md\n');
 
 %% ============ 辅助函数 ============
 function M = fha_gain(fn,q,mm)
