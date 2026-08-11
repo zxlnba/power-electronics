@@ -3,7 +3,7 @@
   * @file    llc_ctrl.h
   * @brief   1kW 全桥 LLC —— 数字电压环闭环控制（2p2z / Type II + 软启动）
   *
-  *   被控对象（降阶模型，见 control-loop/llc_loop_design.m）：
+  *   被控对象（降阶模型，见 ../01-设计样机/环路设计/llc_loop_design.m）：
   *     Gvd(s) = K_f*(1+s/wz_lm) / ((1+s/wp_out)*(1 + s/(wr*Qr) + s^2/wr^2))
   *     fs=fr=107kHz 工作点：K_f = -0.505 V/kHz（400V 输入，m=Lm/Lr=7.4，与负载无关）。
   *     **极性：fs↑ ⇒ Vout↓（K_f<0），2p2z 的负号编码了反相，切勿改动符号。**

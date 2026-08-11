@@ -1,7 +1,7 @@
 # LLC 数字电压环设计（1kW 样机）
 
 > 配套 MATLAB 脚本：[`llc_loop_design.m`](llc_loop_design.m) — 所有数值均可复现。
-> 固件实现：[`voltage-sampling/src/llc_ctrl.{h,c}`](../voltage-sampling/src/llc_ctrl.h)
+> 固件实现：[`../../03-调试代码/src/llc_ctrl.{h,c}`](../../03-调试代码/src/llc_ctrl.h)
 
 ## 概述
 
@@ -196,7 +196,7 @@ fs  = clamp(fr + w, 95k, 130k)
 | a1 | -1.54594167 |
 | a2 | 0.54594167 |
 
-系数已写进 `voltage-sampling/src/llc_ctrl.h`，由 `llc_loop_design.m` 生成。
+系数已写进 `../../03-调试代码/src/llc_ctrl.h`，由 `llc_loop_design.m` 生成。
 离散化引入的 1 拍计算延迟使 PM 从 80.9° 降到 71.0°（±10°），在可接受范围。
 
 > ⚠️ **2026-08 更正**：早期版本（aeb13cf）FHA 公式有误（`1/|1+((fn²-1)/fn)(1/(fn·m·Q)+j)|`
@@ -233,7 +233,7 @@ fs  = clamp(fr + w, 95k, 130k)
    `vmeas = (vp + |vn|)/2`，目标 200V。**采样时间已从 640 周期(60µs) 缩短到
    12.5 周期(~2.4µs)**，并在 HRTIM TimerD REP 周期中断内软件触发（周期边界、
    相位锁定），每开关周期 9.35µs 可闭环（见 §11 与
-   [`scaled-low-voltage-test-plan.md`](./scaled-low-voltage-test-plan.md) §5）。
+   [`../../04-60V缩尺300W/scaled-low-voltage-test-plan.md`](../../04-60V缩尺300W/scaled-low-voltage-test-plan.md) §5）。
 2. **控制率**：在开关周期中断（HRTIM TimerD REP）里调用 `llc_ctrl_period_isr()`
    （每 9.35µs），不是 100ms 轮询。`llc_ctrl_update()` 实现 2p2z。
 3. **频率写入**：`llc_apply_frequency(fs)` 把 fs 换算成 HRTIM TimerD 周期寄存器
@@ -249,7 +249,7 @@ fs  = clamp(fr + w, 95k, 130k)
 
 4. **保护**：过流 > 3A 锁存（`g_llc_fault`），REP 中断里停止 TimerD 计数与输出。
 5. **上电时序**：输出以 130kHz（最低增益）起步 → 2s 窗口合母线 → 软启动
-   130k→107k 斜坡 → 切入闭环（见 scaled-low-voltage-test-plan.md §4）。
+   130k→107k 斜坡 → 切入闭环（见 ../../04-60V缩尺300W/scaled-low-voltage-test-plan.md §4）。
 
 ---
 
@@ -284,13 +284,9 @@ PLECS 复验。
 ## 文件结构
 
 ```
-control-loop/
+环路设计/
 ├── README.md                ← 本文件（环路设计）
 ├── llc_loop_design.m        ← 全部环路设计计算（可复现）
-├── llc_theory.m             ← FHA 增益理论曲线 + 时域精确解（回答"低于谐振是否升压"）
-├── llc_rescale.m            ← 60V/300W 专用腔方案A（Lr=7µH/Cr=470nF/Lm=24µH，新变压器，见 ../docs/工程开发文档.md §3）
-├── llc_sim.m                ← 时域仿真 + 损耗灵敏度（复现实测 60V/46Ω 数据）
-├── scaled-low-voltage-test-plan.md  ← 60V 缩尺测试方案（方案A 专用腔）
 ├── tutorial/                ← 交互式 LLC 教学页
 └── images/
     ├── fha-gain-curves.png
@@ -302,6 +298,9 @@ control-loop/
 > **2026-08-11 实测对齐**：Lm 实测 2mH 与设计书 §3.2 的 k=7.4（Lm=2.0mH）一致；
 > fr 实测 ~105kHz（设计 107k）、死区实测驱动板 250ns 硬件死区 + HRTIM 59ns
 > （hrtim.c:79-82）→ 全桥占空丢失 ~7-13%。这些参数会改变 K_f 与升压裕量，
-> **改腔/调参前重跑 `llc_theory.m` / `llc_rescale.m`**。
+> **改腔/调参前重跑 `llc_loop_design.m`**。
+> 60V 缩尺设计（60V 专用腔）、FHA 理论、时域仿真与测试计划已移到
+> [`../../04-60V缩尺300W/`](../../04-60V缩尺300W/)（llc_theory.m / llc_rescale.m /
+> llc_sim.m / scaled-low-voltage-test-plan.md）。
 > 60V 缩尺测试的设计点不匹配教训与改腔方案见
-> [`../docs/工程开发文档.md`](../docs/工程开发文档.md)。
+> [`../工程开发文档.md`](../工程开发文档.md)。
