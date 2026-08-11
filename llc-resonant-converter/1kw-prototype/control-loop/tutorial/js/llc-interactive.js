@@ -52,8 +52,8 @@ const Int = (function () {
     host.append(ctl, cv, ro);
     const P = LLC.P;
     const loads = { full: { q: P.Q, name: '满载' }, half: { q: P.Q / 2, name: '50%负载' }, quar: { q: P.Q / 4, name: '25%负载' } };
-    let m = 5, lk = 'full';
-    slider(ctl, 'Lm/Lr (m)', 3, 7, 0.1, 5, v => v.toFixed(1), v => { m = v; draw(); });
+    let m = 7.4, lk = 'full';
+    slider(ctl, 'Lm/Lr (m)', 3, 10, 0.1, 7.4, v => v.toFixed(1), v => { m = v; draw(); });
     select(ctl, '负载', [['full', '满载'], ['half', '50%'], ['quar', '25%']], v => { lk = v; draw(); });
 
     function draw() {

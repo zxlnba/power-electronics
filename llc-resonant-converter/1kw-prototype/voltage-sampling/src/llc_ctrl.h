@@ -5,7 +5,7 @@
   *
   *   被控对象（降阶模型，见 control-loop/llc_loop_design.m）：
   *     Gvd(s) = K_f*(1+s/wz_lm) / ((1+s/wp_out)*(1 + s/(wr*Qr) + s^2/wr^2))
-  *     fs=fr=107kHz 工作点：K_f = -0.748 V/kHz（400V 输入），与负载无关。
+  *     fs=fr=107kHz 工作点：K_f = -0.505 V/kHz（400V 输入，m=Lm/Lr=7.4，与负载无关）。
   *     **极性：fs↑ ⇒ Vout↓（K_f<0），2p2z 的负号编码了反相，切勿改动符号。**
   *
   *   补偿器（Type II：积分 + 20Hz 零点 + 10kHz 高频极点），Tustin 离散为 2p2z，
@@ -31,10 +31,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-/* ============ 2p2z 系数（llc_loop_design.m 生成，勿手改） ============ */
-#define LC_B0  -30456.162712f
-#define LC_B1  -35.760097f
-#define LC_B2  30420.402615f
+/* ============ 2p2z 系数（llc_loop_design.m 生成，勿手改；m=7.4 实测 Lm=2mH） ============ */
+#define LC_B0  -45051.85926587f
+#define LC_B1  -52.89763081f
+#define LC_B2  44998.96163506f
 #define LC_A1  -1.54594167f
 #define LC_A2  0.54594167f
 
