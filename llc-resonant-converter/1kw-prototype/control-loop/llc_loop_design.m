@@ -11,17 +11,18 @@
 % 依赖：Control System Toolbox（tf/bode/c2d）
 % 输出：console 打印全部设计值 + control-loop/images/ 下 4 张图 + 系数文件
 %
-% 重要假设（请按实测修改）：
-%   Lm = 7.4*Lr  (λ=0.135)  ← LCR 表实测原边电感 Lm=2mH，Lr=270uH => m=7.4
+% 设计参数（参数作品设计书 §3.2，1kW 权威值）：
+%   k = Lm/Lr = 7.4，Lm = k·Lr ≈ 2.0mH，Lr=270uH，Cr=8.2nF，fr=107kHz，n=2（每路 28:14）
+%   Rac(1k) = (8n²/π²)·Rdc = (8×4/π²)×160 = 518.5Ω → 满载 Q = Z0/Rac = 0.35
 %   Co = 100uF/路      ← 按实际输出电容修改
 %   fs 工作点 = fr (满载)  ← 变频调节范围 95~130kHz
 %
-% 验算注记（Q 折算约定，2026-08-11）：
-%   本脚本的 Rac = V1rms²/P = 129.6Ω 是【功率守恒的物理值】，满载 Q=1.4。
-%   参数作品设计书的 Req=(8n²/π²)·Vo²/Po 用半绕组比 n=2 配总母线负载 160Ω
-%   得到 518.5Ω、纸面 Q=0.35 —— 那是把半绕组折算约定与整绕组负载混用，比物理值大 4 倍。
-%   增益曲线 / 升压裕量 / 60V 高 Q 行为一律以物理 Q=1.4 为准（FHA 曲线决定实际表现）。
-%   额定点 fs=fr、M=1 时 Q 取值不影响输出，故 1kW 设计在额定点依然成立。
+% Q 折算约定（2026-08-11）：
+%   满载品质因数按设计书口径：Q = Z0/Rac = 0.35（Rac=518.5Ω，n=2 半绕组折算）。
+%   若按功率守恒折算 Rac' = V1rms²/P = 129.7Ω，等效 Q ≈ 1.4 = 0.35×4（差 4 倍源于 n²）。
+%   K_f 与 2p2z 系数只依赖 m 与输出极点 fp_out，与 Q 无关 —— 固件系数不受 Q 口径影响。
+%   增益曲线/升压裕量按设计书 Q=0.35 绘图；60V 重载分析用功率守恒口径（见
+%   ../docs/工程开发文档.md），60V 负载换算 Q 远超 0.35，结论一致。
 
 clear; clc; close all;
 
@@ -29,7 +30,7 @@ clear; clc; close all;
 % 谐振腔
 Lr       = 270e-6;      % 谐振电感
 Cr       = 8.2e-9;      % 谐振电容
-Lm_ratio = 7.4;         % Lm/Lr = 7.4  => λ=Lr/Lm≈0.135（LCR 实测 Lm=2mH，Lr=270uH）
+Lm_ratio = 7.4;         % Lm/Lr = 7.4  => λ=Lr/Lm≈0.135（设计书 §3.2 k 值，Lm=2.0mH；LCR 实测一致）
 Lm       = Lm_ratio*Lr;
 % 功率级
 n        = 2.0;         % 每路变换比 28:14（全绕组 1:1，中心抽头分两个 14T 半绕组）
@@ -50,31 +51,43 @@ fr   = 1/(2*pi*sqrt(Lr*Cr));        % 谐振频率
 fm   = 1/(2*pi*sqrt((Lr+Lm)*Cr));   % 第二谐振频率
 Z0   = sqrt(Lr/Cr);                 % 特征阻抗
 V1rms = (2*sqrt(2)/pi)*Vin_nom;     % 全桥输出方波基波 rms
-Rac  = V1rms^2 / P_total;           % 反射交流等效电阻
-Q    = Z0/Rac;                      % 品质因数（满载）
+% 设计书口径（§3.2）：Rac(1k)=(8n²/π²)·Rdc_full，Rdc_full=400V²/1kW=160Ω，n=2（每路 28:14）
+Rdc_full = (2*Vout_rail)^2 / P_total;   % 全母线等效负载 160Ω
+Rac_db   = (8*n^2/pi^2) * Rdc_full;     % 设计书反射交流等效电阻 518.5Ω
+Q        = Z0 / Rac_db;                 % 满载品质因数（设计书 Q=0.35）
+% 功率守恒折算（验算用）：Rac'=V1rms²/P=129.7Ω → 等效 Q≈1.4（=0.35×4，差 n²）
+Rac_phys = V1rms^2 / P_total;
+Q_phys   = Z0 / Rac_phys;
 Rload_rail = Vout_rail^2/(P_total/2);
 fp_out = 1/(2*pi*Rload_rail*Co_rail);  % 输出极点
 
 fprintf('===== 谐振参数 =====\n');
 fprintf('fr = %.1f kHz,  fm = %.1f kHz,  Z0 = %.1f ohm\n', fr/1e3, fm/1e3, Z0);
-fprintf('Rac'' = %.1f ohm,  Q(满载) = %.3f\n', Rac, Q);
+fprintf('Rac(设计书) = %.1f ohm,  Q(满载,设计书) = %.3f\n', Rac_db, Q);
+fprintf('  验算: Rac''=V1rms²/P=%.1f ohm → 等效 Q≈%.2f（=设计书Q×4，仅口径差，K_f/2p2z 不受影响）\n', Rac_phys, Q_phys);
 fprintf('Rload_rail = %.1f ohm,  fp_out = %.1f Hz\n\n', Rload_rail, fp_out);
 
 %% ============ 3. FHA 增益曲线与升压裕量 ============
 % 标准 FHA：M(fn,Q,m) = 1/sqrt((1+λ-λ/fn²)² + Q²(fn-1/fn)²)，λ=Lr/Lm=1/m
 % （与精确 AC 电路传递 |Zp/(Zseries+Zp)| 一致，见 fha_gain 注释）
 fn = linspace(0.55, 1.6, 4000);
+fn_min = fs_min/fr;                        % 频带下限 fn=0.888（fs_min=95kHz）
 Mfull = arrayfun(@(x) fha_gain(x,Q,Lm_ratio), fn);
 Mhalf = arrayfun(@(x) fha_gain(x,Q/2, Lm_ratio), fn);   % 50% 负载: Rac×2, Q/2
 Mquar = arrayfun(@(x) fha_gain(x,Q/4, Lm_ratio), fn);   % 25% 负载: Rac×4, Q/4
 
-[MMax_full, ipeak] = max(Mfull);
+% 频带内（fn≥0.888）可达最大增益
+iband = fn >= fn_min;
+fnband = fn(iband);
+[MMax_full, ipeak] = max(Mfull(iband));
 fprintf('===== FHA 升压裕量（设计发现） =====\n');
 fprintf('M_max(满载,Q=%.2f) = %.3f @ fn=%.3f  -> 最低可保持输入 %.0f V\n', ...
-        Q, MMax_full, fn(ipeak), Vin_nom/MMax_full);
+        Q, MMax_full, fnband(ipeak), Vin_nom/MMax_full);
 fprintf('  360V 输入需要 M=%.3f -> 满载无法保持 ±200V（输出将随输入跌落）\n', Vin_nom/360);
-fprintf('  50%%负载 M_max=%.3f (%.0fV), 25%%负载 M_max=%.3f (%.0fV)\n\n', ...
-        max(Mhalf), Vin_nom/max(Mhalf), max(Mquar), Vin_nom/max(Mquar));
+fprintf('  50%%负载 M_max=%.3f (%.0fV), 25%%负载 M_max=%.3f (%.0fV)（均受 fs_min 限制）\n\n', ...
+        max(Mhalf(iband)), Vin_nom/max(Mhalf(iband)), ...
+        max(Mquar(iband)), Vin_nom/max(Mquar(iband)));
+
 
 %% ============ 4. 静态灵敏度 K_f（fs=fr 工作点） ============
 % dM/dfn @fn=1 = -2/m（标准 FHA 公式性质：与负载 Q 无关）
@@ -191,8 +204,8 @@ yline(1,'k:'); yline(Vin_nom/360,'r--','M=1.111 @360V','LabelVerticalAlignment',
 yline(MMax_full,'r:','M_max 满载');
 xline(1,'k:'); ylim([0.5 1.4]); grid on;
 xlabel('fn = fs/fr'); ylabel('电压增益 M');
-legend('满载 (Q=1.4)','50%负载','25%负载','Location','northeast');
-title('FHA 增益曲线 —— 满载升压裕量不足（<1.02）');
+legend(sprintf('满载 (Q=%.2f)',Q),'50%负载','25%负载','Location','northeast');
+title('FHA 增益曲线 —— 满载升压裕量不足');
 saveas(gcf, fullfile(figdir,'fha-gain-curves.png'));
 
 % 图2: 开环 Bode（连续 + 离散）
