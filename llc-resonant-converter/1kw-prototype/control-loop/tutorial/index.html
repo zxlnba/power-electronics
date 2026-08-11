@@ -73,7 +73,7 @@
 
       <ul>
         <li><strong>fn = fs/fr</strong>：横轴是"频率归一化到谐振点"。fn=1 是谐振点，左边降压区（升压），右边升压区（降压）。</li>
-        <li><strong>M_max</strong>：升压的物理上限。看红色标注——满载时只有 1.011，也就是说<em>满负载下想大幅升压是做不到的</em>（第八章详解）。</li>
+        <li><strong>M_max</strong>：升压的物理上限。看红色标注——满载时只有 1.005，也就是说<em>满负载下想大幅升压是做不到的</em>（第八章详解）。</li>
         <li>试试把负载切到 25%：曲线峰值明显抬高（1.243）。<strong>负载越轻，越能升压</strong>。</li>
       </ul>
 
@@ -81,7 +81,7 @@
       <ol>
         <li>旋钮 = 开关频率 fs，范围 95–130kHz，额定在 fr = 107kHz。</li>
         <li>反相：fs↑ → Vout↓。</li>
-        <li>升压上限 M_max 是物理极限，满载时很小（1.011）。</li>
+        <li>升压上限 M_max 是物理极限，满载时很小（1.005）。</li>
       </ol>
     </section>
 
@@ -100,7 +100,7 @@
 
       <table>
         <tr><th>因子</th><th>数值</th><th>物理含义</th><th>影响</th></tr>
-        <tr><td><b>K_f</b>（直流增益）</td><td class="num">-0.748 V/kHz</td><td>拧 1kHz 频率，输出稳态变 0.75V</td><td>决定"旋钮的力气"</td></tr>
+        <tr><td><b>K_f</b>（直流增益）</td><td class="num">-0.505 V/kHz</td><td>拧 1kHz 频率，输出稳态变 0.51V</td><td>决定"旋钮的力气"</td></tr>
         <tr><td><b>输出极点</b> fp_out</td><td class="num">19.9 Hz</td><td>Co=100µF × 负载 80Ω，τ=8ms（满载值；轻载 Rload 变大，极点左移）</td><td>决定"响应多慢"</td></tr>
         <tr><td><b>谐振极点</b> fr</td><td class="num">107 kHz</td><td>谐振腔的固有振荡</td><td>离得远，影响小</td></tr>
       </table>
@@ -176,7 +176,7 @@
       <table>
         <tr><th>指标</th><th>物理含义</th><th>设计值</th></tr>
         <tr><td><b>穿越频率 fco</b></td><td>增益 = 1（0dB）的频率。<strong>环路能纠正多快的扰动</strong>。≈ 响应速度。</td><td class="num">~2 kHz</td></tr>
-        <tr><td><b>相位裕度 PM</b></td><td>在 fco 处，相位离 -180°（振荡线）还剩多少。剩得越多越稳。</td><td class="num">70.5°</td></tr>
+        <tr><td><b>相位裕度 PM</b></td><td>在 fco 处，相位离 -180°（振荡线）还剩多少。剩得越多越稳。</td><td class="num">71.0°</td></tr>
       </table>
       <p>直觉：<strong>骑自行车</strong>。你每偏离直线一点就往回扶一下——但如果你"扶"的增益太大（反应过头），加上 2 拍延迟，就会左右蛇形（振荡）；如果增益太小，就压不住风（扰动）。相位裕度就是你心里默数的那一拍，还能不能来得及修正。PM ≤ 0 → 振荡/发散。</p>
 
@@ -224,8 +224,8 @@
 
       <div class="callout">
         <span class="t">🧪 设计出来的指标（连续域）</span>
-        K<sub>c</sub> = -1.6848×10⁷，零点 20Hz，极点 10kHz<br>
-        fco ≈ <strong>1960 Hz</strong>，PM ≈ <strong>80.4°</strong>，GM ≈ <strong>43.8 dB</strong><br>
+        K<sub>c</sub> = -2.4922×10⁷，零点 20Hz，极点 10kHz<br>
+        fco ≈ <strong>1960 Hz</strong>，PM ≈ <strong>80.9°</strong>，GM ≈ <strong>43.3 dB</strong><br>
         穿越频率只有开关频率（107kHz）的 1/50——这是刻意的：环路只"看平均"，不跟开关纹波较劲。
       </div>
     </section>
@@ -241,7 +241,7 @@
         <li><strong>采样</strong>（ZOH 保持）：本来连续的信号变成台阶。</li>
         <li><strong>一拍计算延迟</strong>：这一拍看到的电压，下一拍才轮到修正。</li>
       </ul>
-      <p>两者合起来，在 2kHz 穿越处吃掉约 <strong>10° 相位</strong>。所以连续域 PM 80.4°，离散后 <strong>70.5°</strong>——这就是为什么设计要"离散化后再验一遍"。</p>
+      <p>两者合起来，在 2kHz 穿越处吃掉约 <strong>10° 相位</strong>。所以连续域 PM 80.9°，离散后 <strong>71.0°</strong>——这就是为什么设计要"离散化后再验一遍"。</p>
 
       <h3>6.2 Tustin：把 s 域翻译成 z 域</h3>
       <p>补偿器是连续传函 C(s)，单片机不能算 s，要用一个近似把连续变成离散差分方程。常用 <strong>Tustin 变换</strong>：</p>
@@ -259,9 +259,9 @@ fs = clamp(fr + w, 95k, 130k);   // 频率指令，带回钳位
 
       <h3>6.3 系数怎么来</h3>
       <p>这套系数（b0…a2）不是你手算的，是 <code class="inline">llc_loop_design.m</code> 自动算出来的：设计 C(s) → Tustin 离散 → 提取系数 → 写进 <code class="inline">llc_ctrl.h</code>。你要改的是参数（Lm、Co），不是系数。</p>
-      <pre><code>#define LC_B0  -30456.16f
-#define LC_B1  -35.76f
-#define LC_B2  30420.40f
+      <pre><code>#define LC_B0  -45051.86f
+#define LC_B1  -52.90f
+#define LC_B2  44998.96f
 #define LC_A1  -1.54594f
 #define LC_A2  0.54594f</code></pre>
       <div class="callout warn">
@@ -280,7 +280,7 @@ fs = clamp(fr + w, 95k, 130k);   // 频率指令，带回钳位
         <tr><th>参数</th><th>值</th><th>参数</th><th>值</th></tr>
         <tr><td>输入 Vin</td><td class="num">360–440V</td><td>Lr</td><td class="num">270µH</td></tr>
         <tr><td>输出</td><td class="num">±200V / 各 500W</td><td>Cr</td><td class="num">8.2nF</td></tr>
-        <tr><td>变比 n（每路）</td><td class="num">2:1*</td><td>Lm/Lr</td><td class="num">≈5（待实测）</td></tr>
+        <tr><td>变比 n（每路）</td><td class="num">2:1*</td><td>Lm/Lr</td><td class="num">≈7.4（实测 Lm=2mH）</td></tr>
         <tr><td>fr</td><td class="num">107kHz</td><td>Co</td><td class="num">100µF/路（待确认）</td></tr>
       </table>
       <p class="foot">*n 是<strong>每路</strong>变换比：原边 28T : 半绕组 14T。变压器<strong>全绕组 1:1</strong>（28T:28T，中心抽头分两个 14T 半绕组），400V 进 → 每路 200V，合计 400V 出。</p>
@@ -288,10 +288,10 @@ fs = clamp(fr + w, 95k, 130k);   // 频率指令，带回钳位
       <h3>7.2 生产线：从物理到系数</h3>
       <ol>
         <li><strong>谐振参数</strong>：fr、fm、Z0、Q —— 算出满载工作点 Q = 1.40。</li>
-        <li><strong>增益与灵敏度</strong>：FHA 增益曲线 → K_f = -0.748 V/kHz（负载无关）。</li>
+        <li><strong>增益与灵敏度</strong>：FHA 增益曲线 → K_f = -0.505 V/kHz（负载无关）。</li>
         <li><strong>被控对象</strong>：Gvd(s) 三阶，输出极点 19.9Hz（满载，轻载左移），谐振极点 107kHz。</li>
-        <li><strong>补偿器</strong>：Type II（积分 + 20Hz 零点 + 10kHz 极点），K_c = -1.68×10⁷ → 连续域 fco 1960Hz / PM 80.4° / GM 43.8dB。</li>
-        <li><strong>离散化</strong>：Tustin → 2p2z 系数 → 含一拍延迟 PM 70.5°。</li>
+        <li><strong>补偿器</strong>：Type II（积分 + 20Hz 零点 + 10kHz 极点），K_c = -2.49×10⁷ → 连续域 fco 1960Hz / PM 80.9° / GM 43.3dB。</li>
+        <li><strong>离散化</strong>：Tustin → 2p2z 系数 → 含一拍延迟 PM 71.0°。</li>
         <li><strong>闭环验证</strong>：离散闭环仿真 → 峰值偏差、恢复时间。</li>
         <li><strong>固件</strong>：2p2z 三行代码 + 频率钳位 + 过流保护 + HRTIM 写入。</li>
       </ol>
@@ -316,7 +316,7 @@ HRTIM1->sTimerxRegs[HRTIM_TIMERID_TIMER_D].CR2 |= HRTIM_CR2_SWU;
 </code></pre>
       <div class="callout">
         <span class="t">✅ 最终体检表（离散域）</span>
-        fco ≈ <strong>1962 Hz</strong> · PM ≈ <strong>70.5°</strong> · GM ≈ <strong>43.8 dB</strong> · 每开关周期控制（9.35µs）
+        fco ≈ <strong>1963 Hz</strong> · PM ≈ <strong>71.0°</strong> · GM ≈ <strong>43.3 dB</strong> · 每开关周期控制（9.35µs）
       </div>
     </section>
 
@@ -326,10 +326,10 @@ HRTIM1->sTimerxRegs[HRTIM_TIMERID_TIMER_D].CR2 |= HRTIM_CR2_SWU;
       <p class="ch-sub">把你设计里真正会问出口的问题一次答完</p>
 
       <h3>8.1 为什么满载 + 360V 时 ±200V 会稳不住？</h3>
-      <p>因为<strong>谐振腔的物理极限</strong>：360V 输入要得到 200V 输出，需要增益 M = 400/360 = <strong>1.111</strong>。但满载时阻尼很大（Q=1.4），增益峰值只有 <strong>M_max = 1.011</strong>（回 01 课的曲线看看）。物理上给不出 1.111，所以控制器把旋钮拧到底（fs_min=95kHz）也没用，输出随输入跌落。<strong>这是硬件问题，不是环路问题</strong>。要改得调 Lm/Lr 或 Lr/Cr（降 Q），让秋千能荡更高——代价是 ZVS 裕量和轻载效率。</p>
+      <p>因为<strong>谐振腔的物理极限</strong>：360V 输入要得到 200V 输出，需要增益 M = 400/360 = <strong>1.111</strong>。但满载时阻尼很大（Q=1.4），增益峰值只有 <strong>M_max = 1.005</strong>（回 01 课的曲线看看）。物理上给不出 1.111，所以控制器把旋钮拧到底（fs_min=95kHz）也没用，输出随输入跌落。<strong>这是硬件问题，不是环路问题</strong>。要改得调 Lm/Lr 或 Lr/Cr（降 Q），让秋千能荡更高——代价是 ZVS 裕量和轻载效率。</p>
 
       <h3>8.2 K_f 会随负载变吗？——一个被纠正的旧说法</h3>
-      <p>早期版本用了一个不完整的 FHA 公式，得到"K_f 随负载变 4 倍"的结论（满载 -0.535，25% 负载 -2.138 V/kHz）。用标准 FHA 公式核对后：<strong>fn=1 处增益曲线斜率 dM/dfn = -2/m，与负载 Q 无关</strong>，所以 K_f 恒为 <strong>-0.748 V/kHz</strong>。真正随负载变的是<strong>输出极点</strong>：轻载时 Rload 变大，fp_out = 1/(2π·Rload·Co) 左移（50% → 10Hz）。极点左移让低频增益变平、fco 下移，PM 反而更高（50% 负载 PM 84.5°，25% 负载 85.8°）。<strong>结论反过来了：负载越轻，环路越稳</strong>——"一个增益发四个负载都稳"这件事比原来想的更省心。</p>
+      <p>早期版本用过不完整的 FHA 公式 + 未实测的 Lm 假设（m=5），K_f 偏差近 1.5 倍。用标准 FHA 公式 + LCR 实测 Lm=2mH（m=7.4）核对后：<strong>fn=1 处增益曲线斜率 dM/dfn = -2/m，与负载 Q 无关</strong>，所以 K_f 恒为 <strong>-0.505 V/kHz</strong>。真正随负载变的是<strong>输出极点</strong>：轻载时 Rload 变大，fp_out = 1/(2π·Rload·Co) 左移（50% → 10Hz）。极点左移让低频增益变平、fco 下移，PM 反而更高（50% 负载 PM 84.8°，25% 负载 85.9°）。<strong>结论反过来了：负载越轻，环路越稳</strong>——"一个增益发四个负载都稳"这件事比原来想的更省心。</p>
 
       <h3>8.3 为什么穿越频率敢设在 2kHz 而不是 20kHz？</h3>
       <p>三个理由：① 离开关频率 107kHz 有 50 倍远，环路"看平均不看纹波"，模型里的谐振极点影响可忽略（只有 12°）；② 2kHz 已远高于输出极点 19.9Hz，动态足够快；③ 再快就要跟开关纹波和采样噪声较劲，还会逼近采样保持 + 一拍延迟带来的相位损失上限。</p>
@@ -338,7 +338,7 @@ HRTIM1->sTimerxRegs[HRTIM_TIMERID_TIMER_D].CR2 |= HRTIM_CR2_SWU;
       <p>设计是按<strong>每开关周期控制</strong>做的（Ts = 9.35µs）。如果采样要 60µs（现在的 640 周期采样），一个控制周期都做不完，等于把控制率降到 1/6，环路带宽大打折扣，还会引入额外延迟。<strong>实测前必须把 ADC 采样缩短到 ≤4.5µs</strong>。</p>
 
       <h3>8.5 为什么 Lm 必须实测？</h3>
-      <p>Lm 进 K_f 的公式（K_f ∝ -2/m，m=Lm/Lr），直接决定增益标定；还决定 M_max（升压能力）和 fm。设计里按 Lm=5×Lr 假设，如果实测是 4 或 6，K_f 会偏 20% 上下（m=4 时 K_f 大 25%）。<strong>用 LCR 表量原边电感</strong>，改完重跑 <code class="inline">llc_loop_design.m</code>，系数自动更新。</p>
+      <p>Lm 进 K_f 的公式（K_f ∝ -2/m，m=Lm/Lr），直接决定增益标定；还决定 M_max（升压能力）和 fm。设计最初按 Lm=5×Lr 假设，LCR 表实测原边电感 <strong>Lm=2mH</strong>（m=7.4）后，K_f 从 -0.748 修正为 -0.505 V/kHz（差 1.48 倍）——这就是本次全线改系数、改教程的根因。<strong>用 LCR 表量原边电感</strong>，改完重跑 <code class="inline">llc_loop_design.m</code>，系数自动更新。</p>
     </section>
 
     <!-- ================= 09 练习 ================= -->
@@ -354,7 +354,7 @@ HRTIM1->sTimerxRegs[HRTIM_TIMERID_TIMER_D].CR2 |= HRTIM_CR2_SWU;
 
       <details>
         <summary>Q2：满载 360V 输入时，为什么调频也救不回 ±200V？</summary>
-        <div class="ans">谐振腔增益有物理上限 M_max=1.011，而 360V 需要 1.111。</div>
+        <div class="ans">谐振腔增益有物理上限 M_max=1.005，而 360V 需要 1.111。</div>
         <div class="expl">控制器把频率压到 fs_min 就到底了（低于 fn≈0.95 增益反而回落），剩下的缺口是谐振腔给不出来的——这是硬件极限，要改 Lm/Lr 或 Lr/Cr。</div>
       </details>
 
@@ -367,11 +367,11 @@ HRTIM1->sTimerxRegs[HRTIM_TIMERID_TIMER_D].CR2 |= HRTIM_CR2_SWU;
       <details>
         <summary>Q4：轻载时环路更危险，对吗？</summary>
         <div class="ans">反了，轻载反而更稳。</div>
-        <div class="expl">K_f 与负载无关（-0.748 V/kHz）。轻载时输出极点左移，fco 下移、PM 上升（50% 负载 PM 84.5°，25% 负载 85.8°）。最坏工况是满载，所以设计按满载整定即可。</div>
+        <div class="expl">K_f 与负载无关（-0.505 V/kHz）。轻载时输出极点左移，fco 下移、PM 上升（50% 负载 PM 84.8°，25% 负载 85.9°）。最坏工况是满载，所以设计按满载整定即可。</div>
       </details>
 
       <details>
-        <summary>Q5：离散化把 PM 从 80.4° 变成 70.5°，那 10° 去哪了？</summary>
+        <summary>Q5：离散化把 PM 从 80.9° 变成 71.0°，那 10° 去哪了？</summary>
         <div class="ans">采样保持 + 一拍计算延迟。</div>
         <div class="expl">数字控制器每 9.35µs 才看一次、下一拍才动手，在 2kHz 穿越处大约损失 10°。这就是"离散后要重验一遍裕度"的原因。</div>
       </details>

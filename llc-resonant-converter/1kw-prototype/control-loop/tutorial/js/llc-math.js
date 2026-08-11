@@ -22,10 +22,10 @@ const LLC = (function () {
 
   /* ================= 1kW 样机参数 ================= */
   const P = {
-    Lr: 270e-6, Cr: 8.2e-9, LmRatio: 5.0, n: 2.0,
+    Lr: 270e-6, Cr: 8.2e-9, LmRatio: 7.4, n: 2.0,
     Vin: 400, VoutRail: 200, P_total: 1000, CoRail: 100e-6,
     fsNom: 107000, fsMin: 95000, fsMax: 130000,
-    Kc: -1.6848e7, wzHz: 20, wpHz: 10000
+    Kc: -2.4922e7, wzHz: 20, wpHz: 10000
   };
   P.fr = 1 / (2 * Math.PI * Math.sqrt(P.Lr * P.Cr));
   P.fm = 1 / (2 * Math.PI * Math.sqrt((P.Lr + P.LmRatio * P.Lr) * P.Cr));

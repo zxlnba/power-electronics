@@ -1,56 +1,80 @@
-% LLC 谐振腔 60V 改腔设计对比
-% 现腔: Z0=181.5, Lr=275uH, Cr=8.35nF, Lm=2mH, fr=105k, λ=0.135
-% 改腔: Z0=52.2, Lr=79uH,  Cr=29nF,  Lm=2mH, fr=105k, λ=0.040
+% LLC 谐振腔 60V/300W 改腔设计 —— 方案A（换新变压器）
+%
+% 背景：现谐振腔按额定 400V/1kW 设计（Z0=181.5Ω），60V 下负载换算 Q=2~8，
+%       高 Q 增益封顶 M≈1.0 且无升压区（实测 M≈0.8），60V 根本跑不出功率。
+%       要用 60V/300W 电源跑真实功率，必须单独设计 60V 谐振腔。
+%
+% 方案A（60V/300W 专用腔）：
+%   Lr = 7µH, Cr = 470nF, Lm = 24µH, fr ≈ 87.7kHz, Z0 ≈ 3.86Ω, h=Lm/Lr=3.43
+%   满载 60V/300W：R_load=12Ω → Rac=(8/π²)·12=9.73Ω → Q≈0.40（功率守恒物理值）
+%   **必须换新变压器**：现 PQ35 原边 Lm=2mH，方案A 需 Lm≈24µH（差 80 倍），
+%   旧变压器不可用。新变压器 1:1、Lm≈24µH（如 PQ35 重绕 + 气隙，或小 E 磁芯）。
+%
+% Q 折算约定（与 llc_loop_design.m 一致）：
+%   Rac 用功率守恒 V1rms²/P（物理值）。若照搬设计书的 Req=(8n²/π²)·Vo²/Po
+%   半绕组约定，60V 的"纸面 Q"会严重低估、掩盖失败——60V 实测增益塌正是
+%   物理 Q 高的证据。增益曲线/升压裕量一律以物理 Q 为准。
+%
+% 用法：matlab -batch "llc_rescale"
 clear; clc;
-fr = 105000; Vin = 60; R2Q = @(Z,R) Z/(0.8106*R);
-M = @(lam,Q,fn) 1./sqrt((1+lam-lam./fn.^2).^2 + Q.^2.*(fn-1./fn).^2);
 
-% ---- 现腔 vs 改腔: 46Ω 跨全的增益曲线 ----
-Z0a=181.5; lam_a=0.135;         % 现腔
-Z0b=52.2;  lam_b=0.040;         % 改腔 (Lr=Z0b/(2pi fr)=79uH, Cr=1/(Z0b 2pi fr)=29nF)
-Qa = R2Q(Z0a,46); Qb = R2Q(Z0b,46);
-fs=(85:0.5:135)*1e3; fn=fs/fr;
-fprintf('46Ω跨全: 现腔Q=%.2f 改腔Q=%.2f\n',Qa,Qb);
-figure('Position',[60 60 880 500]);
-plot(fs/1e3, M(lam_a,Qa,fn),'LineWidth',1.6); hold on;
-plot(fs/1e3, M(lam_b,Qb,fn),'LineWidth',1.6);
-xline(105,'--','fr=105k'); yline(1,'k:','M=1');
-xlabel('fs [kHz]'); ylabel('M'); grid on; ylim([0 1.15]);
-legend({'现腔 Z0=181 (Q=4.87)','改腔 Z0=52  (Q=1.40)'},'Location','best');
-title('46Ω 跨全负载: 改腔前后增益曲线（无损理想）');
-saveas(gcf,'llc_rescale_46ohm.png');
+%% ============ 方案A 参数 ============
+Lr_new  = 7e-6;
+Cr_new  = 470e-9;
+Lm_new  = 24e-6;            % 新变压器励磁电感（1:1）
+lam     = Lr_new/Lm_new;    % λ=0.2915
+fr_new  = 1/(2*pi*sqrt(Lr_new*Cr_new));   % 87.7kHz
+Z0_new  = sqrt(Lr_new/Cr_new);            % 3.86 ohm
+Vin     = 60.0;
+V1rms   = (2*sqrt(2)/pi)*Vin;             % 全桥基波 rms = 54V
+R2Q     = @(R) Z0_new/(0.8106*R);         % 1:1 整绕组：Rac=(8/π²)·R
+M       = @(la,q,fn) 1./sqrt((1+la-la./fn.^2).^2 + q.^2.*(fn-1./fn).^2);
 
-% ---- 改腔后 (Z0=52.2) 负载功率阶梯 @60V, M=1 ----
-fprintf('\n===== 改腔 Z0=52.2Ω, 60V, 谐振点 M=1 的功率阶梯 =====\n');
-loads = {46,'跨全 46 (18+18+8+2)',0; 36,'跨全 36 (18+18)',0; ...
-         28,'跨全 28 (18+8+2)',0; 26,'跨全 26 (18+8)',0; 18,'跨全 18',0; ...
-         28,'每路 28 (18+8+2)',1; 18,'每路 18',1; 8,'每路 8',1};
-fprintf('%-22s %6s %6s %9s %9s\n','负载','R','Q','P@M=1','Vrail@M=1');
+fprintf('===== 方案A（60V/300W 专用腔） =====\n');
+fprintf('Lr=%.1fuH  Cr=%.0fnF  Lm=%.0fuH  fr=%.1fkHz  Z0=%.2fΩ  λ=%.4f (h=%.2f)\n', ...
+        Lr_new*1e6, Cr_new*1e9, Lm_new*1e6, fr_new/1e3, Z0_new, lam, 1/lam);
+
+%% ============ 满载工作点（300W） ============
+Rfull = Vin^2/300;                 % 12 ohm
+Rac_f = 0.8106*Rfull;              % 9.73 ohm
+Qfull = Z0_new/Rac_f;              % 0.397
+fprintf('满载 60V/300W: R_load=%.1fΩ  Rac=%.2fΩ  Q=%.2f\n\n', Rfull, Rac_f, Qfull);
+
+%% ============ 方案B 对照：把 400V 那套 Z0=181.5 搬到 60V ============
+Qb = 181.5/Rac_f;
+fprintf('===== 方案B 对照（400V 腔搬 60V，不可用） =====\n');
+fprintf('Z0=181.5Ω @60V/300W: Q=%.1f —— 高 Q 增益封顶 M=1.0 无升压区，直接否决\n\n', Qb);
+
+%% ============ 功率阶梯（谐振点 M=1） ============
+loads = {12,'12Ω  (满载)',300; 15,'15Ω',240; 20,'20Ω',180; ...
+         30,'30Ω',120; 46,'46Ω (现有电阻)',78};
+fprintf('===== 方案A 功率阶梯（60V, fs=fr=87.7k, M=1） =====\n');
+fprintf('%-22s %6s %6s %8s %7s\n','负载','R','Q','P','Rac');
 for i=1:size(loads,1)
-  R=loads{i,1}; per=loads{i,3};
-  if per
-    Rac=0.8106*4*R; P=2*R*(Vin/2*1)^2/R^2; Vrail=Vin/2*1;
-  else
-    Rac=0.8106*R;    P=R*1^2/R^2; P=Vin^2*1^2/R; Vrail=NaN;
-  end
-  Q=Z0b/Rac;
-  if per, vrs=sprintf('%d',round(Vrail)); else, vrs='-'; end
-  fprintf('%-22s %6.0f %6.2f %9.0f %9s\n',loads{i,2},R,Q,P,vrs);
+  R = loads{i,1};
+  fprintf('%-22s %6.0f %6.2f %8.0f %7.2f\n', loads{i,2}, R, R2Q(R), 60^2/R, 0.8106*R);
 end
 
-% ---- 改腔后增益曲线随负载（看频率可调范围） ----
-fprintf('\n===== 改腔 Z0=52.2: 各频率增益（跨全） =====\n');
-fprintf('%12s','R(跨全)');
-fk=[95 100 105 110 115 120 125 130];
-for f=fk
-  fprintf('%8.0fk',f);
+%% ============ 增益曲线（方案A vs 方案B 满载） ============
+fs = (65:0.5:115)*1e3;  fn = fs/fr_new;
+figure('Color','w','Position',[60 60 900 520]);
+plot(fs/1e3, M(lam, Qfull, fn), 'LineWidth',1.9); hold on;
+for R=[15 20 30]
+  plot(fs/1e3, M(lam, R2Q(R), fn), '--','LineWidth',1.3);
 end
-fprintf('\n');
-for R=[46 36 28 18]
-  Q=R2Q(Z0b,R);
-  fprintf('%-12s',sprintf('%dΩ (Q=%.1f)',R,Q));
-  for f=fk
-    fprintf('%8.3f',M(lam_b,Q,f*1e3/fr));
-  end
-  fprintf('\n');
+plot(fs/1e3, M(lam, 181.5/(0.8106*12), fn), 'k:', 'LineWidth',1.6); % 方案B
+xline(fr_new/1e3,'k--','fr=87.7k'); yline(1,'k:','M=1'); grid on;
+xlabel('fs [kHz]'); ylabel('M'); ylim([0 1.4]);
+legend({'满载 12Ω (Q=0.40)','15Ω (Q=0.32)','20Ω (Q=0.24)','30Ω (Q=0.16)','方案B 400V腔搬60V (Q=18.7)'},'Location','best');
+title('方案A (Lr=7uH/Cr=470nF/Lm=24uH) @60V 增益曲线 —— 满载 Q=0.4 平坦可调');
+saveas(gcf, 'llc_rescale_60v300w.png');
+
+%% ============ 满载增益 vs fs（看调压范围） ============
+fprintf('\n===== 方案A 满载(12Ω) 各频率增益（60V 输出=60V×M） =====\n');
+fprintf('%8s %8s %9s\n','fs[kHz]','M','Vout');
+for f=[65 70 75 80 87.7 95 100 110 115]
+  fprintf('%8.0f %8.3f %9.1f\n', f, M(lam, Qfull, f*1e3/fr_new), Vin*M(lam, Qfull, f*1e3/fr_new));
 end
+fprintf('\n结论：方案A 满载 Q≈0.4，曲线平缓（65k 时 M≈1.25 有升压余量，>87.7k 平滑降压），\n');
+fprintf('      扫频不塌、软启平滑、闭环留有余量。代价：换 Lr/Cr + 新变压器（Lm≈24µH）。\n');
+fprintf('      固件若跑方案A：LC_FS_NOM≈87.7k，范围约 65~115k，LC_K_GAIN_SCALE 按 Vin 重算。\n');
