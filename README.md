@@ -1,5 +1,26 @@
 # Power Electronics Portfolio
 
+## 仓库地图
+
+```
+power-electronics/
+├── README.md                 ← 本文件
+├── flyback-uc3842/           ← 反激电源（UC3842，72W）
+└── llc-resonant-converter/   ← 全桥 LLC（20kW 纸面设计 + 1kW 原理样机）
+    ├── 20kw-design/          ← FHA 设计 / SiC 选型 / PLECS 仿真 / 竞赛设计书
+    └── 1kw-prototype/        ← 原理图 / PCB / 固件 / 环路设计 / 调试验证
+```
+
+## 📌 最新进展（2026-08-11）
+
+1kW LLC 样机完成 60V 低压测试，**发现谐振腔设计点与 60V 负载不匹配**（现腔 Z0=181.5Ω
+按额定 400V/1kW Q=1.4 设计，60V 可用负载换算 Q=2~8 → 增益封顶 M≈1.0 无升压区，实测
+M≈0.8）。已给出**改腔方案（Z0=52.2）**并整理成完整工程开发文档：
+
+- **完整工程记录**：[`llc-resonant-converter/1kw-prototype/docs/工程开发文档.md`](./llc-resonant-converter/1kw-prototype/docs/工程开发文档.md)
+- **调试日志**：[`llc-resonant-converter/1kw-prototype/docs/调试日志/`](./llc-resonant-converter/1kw-prototype/docs/调试日志/)
+- 教训：任何缩尺/改点测试，先算目标负载 Q、查该 Q 下增益曲线与损耗预算，再定目标电压/功率。
+
 ## 项目
 
 ### [全桥 LLC 谐振变换器](./llc-resonant-converter/)

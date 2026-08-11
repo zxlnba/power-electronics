@@ -31,9 +31,9 @@
 | 输入电压 | Vin | 360–440V DC | 母线 |
 | 输出 | Vout | ±200V / 各 500W | 规格 |
 | 变比 | n | **全绕组 1:1**（28T:28T 中心抽头）；每路 28:14=2:1 | 变压器 |
-| 谐振电感 | Lr | 270µH | 外置电感 |
-| 谐振电容 | Cr | 8.2nF | 谐振腔 |
-| 励磁电感 | Lm | ≈5×Lr（**待实测**） | LCR 表测量 |
+| 谐振电感 | Lr | 270µH（实测 ~275µH） | 外置电感 |
+| 谐振电容 | Cr | 8.2nF（实测 ~8.3nF） | 谐振腔 |
+| 励磁电感 | Lm | **2mH（实测，设计 1.35mH）** | LCR 表实测，λ=Lr/Lm≈0.135（m≈7.4） |
 | 开关频率 | fs | 额定 107kHz，范围 95–130kHz | 设计 |
 | 输出电容 | Co | 100µF/路（**待确认**） | 原理图 |
 | HRTIM 时钟 | — | 170MHz | CubeMX |
@@ -277,11 +277,22 @@ PLECS 复验。
 
 ```
 control-loop/
-├── README.md            ← 本文件
-├── llc_loop_design.m    ← 全部设计计算（可复现）
+├── README.md                ← 本文件（环路设计）
+├── llc_loop_design.m        ← 全部环路设计计算（可复现）
+├── llc_theory.m             ← FHA 增益理论曲线 + 时域精确解（回答"低于谐振是否升压"）
+├── llc_rescale.m            ← 60V 改腔设计（Z0=52.2，功率阶梯，见 ../docs/工程开发文档.md §3）
+├── llc_sim.m                ← 时域仿真 + 损耗灵敏度（复现实测 60V/46Ω 数据）
+├── scaled-low-voltage-test-plan.md  ← 缩尺测试方案（⚠️ §3 已作废，见文件顶部更正）
+├── tutorial/                ← 交互式 LLC 教学页
 └── images/
     ├── fha-gain-curves.png
     ├── loop-bode.png
     ├── closed-loop-step.png
     └── fs-command.png
 ```
+
+> **2026-08-11 实测修正**：Lm 实测 2mH（λ=0.135）、fr 实测 ~105kHz（设计 107k）、
+> 死区实测驱动板 250ns 硬件死区 + HRTIM 59ns（hrtim.c:79-82）→ 全桥占空丢失 ~7-13%。
+> 这些参数会改变 K_f 与升压裕量，**改腔/调参前重跑 `llc_theory.m` / `llc_rescale.m`**。
+> 60V 缩尺测试的设计点不匹配教训与改腔方案见
+> [`../docs/工程开发文档.md`](../docs/工程开发文档.md)。
