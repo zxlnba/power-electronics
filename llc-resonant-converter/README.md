@@ -28,13 +28,18 @@ llc-resonant-converter/
 │   ├── simulation/  (×9 .plecs)
 │   └── images/      (待补充)
 └── 1kw-prototype/
-    ├── README.md                       ← 样机详解
-    ├── 1kW高压隔离LLC变换器原理图说明.docx
+    ├── README.md                       ← 样机详解 + 当前状态
+    ├── docs/                           ← 工程文档集中目录
+    │   ├── 工程开发文档.md              ← 🔥 完整工程开发记录（60V 教训 + 改腔方案）
+    │   ├── 1kW高压隔离LLC变换器原理图说明.docx
+    │   ├── 缩尺方案与闭环固件测试报告.docx
+    │   └── 调试日志/  (ADC 排障 + 采样板全流程)
     ├── pcb/
     │   └── Gerber_PCB1_2026-07-31.zip
     ├── voltage-sampling/
     │   ├── README.md
-    │   ├── NEW YEAR.ioc
+    │   ├── llc_board.ioc
     │   └── src/  (×6 .c/.h)
+    ├── control-loop/                   ← 环路设计 + 理论仿真（MATLAB ×4）
     └── images/      (待补充)
 ```

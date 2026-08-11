@@ -1,13 +1,42 @@
+# ==============================================================
+# Power Electronics Portfolio — .gitignore
+# 原则：可再生的构建产物一律忽略；交付物（docx/pptx/zip/png）
+# 是仓库内容的一部分，明确跟踪，不忽略。
+# ==============================================================
+
+# --- Keil MDK / CubeMX 构建产物 ---
+MDK-ARM/
+output/
+*.uvguix.*
+*.scvd
+*.crf
+*.d
+*.dep
+*.o
+*.axf
+*.map
+*.htm
+*.lnp
+*.lst
+
+# --- 编辑器/系统临时文件 ---
+*.bak
+*.tmp
+~$*.docx
+~$*.doc
+~$*.pptx
+Thumbs.db
+.DS_Store
+
+# --- 其它二进制（确实不进版本控制的，按需 git add -f） ---
 *.doc
-*.docx
-*.pptx
-*.pdf
-*.zip
 *.eprj2
+*.pdf
 *.mp4
-*.jpg
-*.png
 *.exe
 *.dll
 *.bin
 *.rsc
+
+# 注意：*.docx / *.pptx / *.zip / *.png / *.jpg 是设计交付物，
+# 明确纳入版本控制（原理图说明、调试记录、Gerber、仿真曲线图等）。
