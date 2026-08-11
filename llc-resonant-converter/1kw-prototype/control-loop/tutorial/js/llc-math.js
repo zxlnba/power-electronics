@@ -31,8 +31,12 @@ const LLC = (function () {
   P.fm = 1 / (2 * Math.PI * Math.sqrt((P.Lr + P.LmRatio * P.Lr) * P.Cr));
   P.Z0 = Math.sqrt(P.Lr / P.Cr);
   P.V1rms = (2 * Math.SQRT2 / Math.PI) * P.Vin;
-  P.Rac = P.V1rms * P.V1rms / P.P_total;
-  P.Q = P.Z0 / P.Rac;
+  // 设计书 §3.2 口径：Rac = (8n²/π²)·Rdc，Rdc=400V²/1kW=160Ω，n=2 → 518.5Ω，Q=0.35
+  P.Rdc = P.VoutRail * 2 * P.VoutRail * 2 / P.P_total;   // 全母线等效负载 160Ω
+  P.Rac = (8 * P.n * P.n / (Math.PI * Math.PI)) * P.Rdc; // 反射等效电阻 518.5Ω
+  P.Q = P.Z0 / P.Rac;                                    // 满载品质因数 0.35（设计书取值）
+  P.RacPhys = P.V1rms * P.V1rms / P.P_total;             // 验算：功率守恒 129.7Ω → Q≈1.4
+  P.QPhys = P.Z0 / P.RacPhys;
   P.RloadRail = P.VoutRail * P.VoutRail / (P.P_total / 2);
   P.fpOut = 1 / (2 * Math.PI * P.RloadRail * P.CoRail);
 

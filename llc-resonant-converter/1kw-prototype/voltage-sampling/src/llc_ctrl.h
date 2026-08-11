@@ -31,7 +31,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-/* ============ 2p2z 系数（llc_loop_design.m 生成，勿手改；m=7.4 实测 Lm=2mH） ============ */
+/* ============ 2p2z 系数（llc_loop_design.m 生成，勿手改；m=7.4 = 设计书 §3.2 k 值，Lm=2.0mH） ============ */
 #define LC_B0  -45051.85926587f
 #define LC_B1  -52.89763081f
 #define LC_B2  44998.96163506f

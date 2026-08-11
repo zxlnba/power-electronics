@@ -73,7 +73,7 @@
 
       <ul>
         <li><strong>fn = fs/fr</strong>：横轴是"频率归一化到谐振点"。fn=1 是谐振点，左边降压区（升压），右边升压区（降压）。</li>
-        <li><strong>M_max</strong>：升压的物理上限。看红色标注——满载时只有 1.005，也就是说<em>满负载下想大幅升压是做不到的</em>（第八章详解）。</li>
+        <li><strong>M_max</strong>：升压的物理上限。看红色标注——满载时只有 1.034（变频下限 fn=0.888 处），也就是说<em>满负载下想大幅升压是做不到的</em>（第八章详解）。</li>
         <li>试试把负载切到 25%：曲线峰值明显抬高（1.243）。<strong>负载越轻，越能升压</strong>。</li>
       </ul>
 
@@ -81,7 +81,7 @@
       <ol>
         <li>旋钮 = 开关频率 fs，范围 95–130kHz，额定在 fr = 107kHz。</li>
         <li>反相：fs↑ → Vout↓。</li>
-        <li>升压上限 M_max 是物理极限，满载时很小（1.005）。</li>
+        <li>升压上限 M_max 是物理极限，满载时不大（1.034，fn≥0.888 频带内）。</li>
       </ol>
     </section>
 
@@ -280,14 +280,14 @@ fs = clamp(fr + w, 95k, 130k);   // 频率指令，带回钳位
         <tr><th>参数</th><th>值</th><th>参数</th><th>值</th></tr>
         <tr><td>输入 Vin</td><td class="num">360–440V</td><td>Lr</td><td class="num">270µH</td></tr>
         <tr><td>输出</td><td class="num">±200V / 各 500W</td><td>Cr</td><td class="num">8.2nF</td></tr>
-        <tr><td>变比 n（每路）</td><td class="num">2:1*</td><td>Lm/Lr</td><td class="num">≈7.4（实测 Lm=2mH）</td></tr>
+        <tr><td>变比 n（每路）</td><td class="num">2:1*</td><td>Lm/Lr</td><td class="num">7.4（设计书 §3.2：Lm=2.0mH）</td></tr>
         <tr><td>fr</td><td class="num">107kHz</td><td>Co</td><td class="num">100µF/路（待确认）</td></tr>
       </table>
       <p class="foot">*n 是<strong>每路</strong>变换比：原边 28T : 半绕组 14T。变压器<strong>全绕组 1:1</strong>（28T:28T，中心抽头分两个 14T 半绕组），400V 进 → 每路 200V，合计 400V 出。</p>
 
       <h3>7.2 生产线：从物理到系数</h3>
       <ol>
-        <li><strong>谐振参数</strong>：fr、fm、Z0、Q —— 算出满载工作点 Q = 1.40。</li>
+        <li><strong>谐振参数</strong>：fr、fm、Z0、Q —— 满载工作点 Q = 0.35（设计书 §3.2，Rac=518.5Ω）。</li>
         <li><strong>增益与灵敏度</strong>：FHA 增益曲线 → K_f = -0.505 V/kHz（负载无关）。</li>
         <li><strong>被控对象</strong>：Gvd(s) 三阶，输出极点 19.9Hz（满载，轻载左移），谐振极点 107kHz。</li>
         <li><strong>补偿器</strong>：Type II（积分 + 20Hz 零点 + 10kHz 极点），K_c = -2.49×10⁷ → 连续域 fco 1960Hz / PM 80.9° / GM 43.3dB。</li>
@@ -326,10 +326,10 @@ HRTIM1->sTimerxRegs[HRTIM_TIMERID_TIMER_D].CR2 |= HRTIM_CR2_SWU;
       <p class="ch-sub">把你设计里真正会问出口的问题一次答完</p>
 
       <h3>8.1 为什么满载 + 360V 时 ±200V 会稳不住？</h3>
-      <p>因为<strong>谐振腔的物理极限</strong>：360V 输入要得到 200V 输出，需要增益 M = 400/360 = <strong>1.111</strong>。但满载时阻尼很大（Q=1.4），增益峰值只有 <strong>M_max = 1.005</strong>（回 01 课的曲线看看）。物理上给不出 1.111，所以控制器把旋钮拧到底（fs_min=95kHz）也没用，输出随输入跌落。<strong>这是硬件问题，不是环路问题</strong>。要改得调 Lm/Lr 或 Lr/Cr（降 Q），让秋千能荡更高——代价是 ZVS 裕量和轻载效率。</p>
+      <p>因为<strong>谐振腔的物理极限</strong>：360V 输入要得到 200V 输出，需要增益 M = 400/360 = <strong>1.111</strong>。但满载在变频下限 fs_min=95kHz（fn=0.888）时增益最多 <strong>M_max = 1.034</strong>（设计书 Q=0.35，回 01 课的曲线看看）。物理上给不出 1.111，所以控制器把旋钮拧到底（fs_min）也没用，输出随输入跌落。<strong>这是硬件问题，不是环路问题</strong>。要改得调 Lm/Lr 或 Lr/Cr，提高增益上限——代价是 ZVS 裕量和轻载效率。</p>
 
       <h3>8.2 K_f 会随负载变吗？——一个被纠正的旧说法</h3>
-      <p>早期版本用过不完整的 FHA 公式 + 未实测的 Lm 假设（m=5），K_f 偏差近 1.5 倍。用标准 FHA 公式 + LCR 实测 Lm=2mH（m=7.4）核对后：<strong>fn=1 处增益曲线斜率 dM/dfn = -2/m，与负载 Q 无关</strong>，所以 K_f 恒为 <strong>-0.505 V/kHz</strong>。真正随负载变的是<strong>输出极点</strong>：轻载时 Rload 变大，fp_out = 1/(2π·Rload·Co) 左移（50% → 10Hz）。极点左移让低频增益变平、fco 下移，PM 反而更高（50% 负载 PM 84.8°，25% 负载 85.9°）。<strong>结论反过来了：负载越轻，环路越稳</strong>——"一个增益发四个负载都稳"这件事比原来想的更省心。</p>
+      <p>早期版本用过不完整的 FHA 公式 + 误设的 Lm 假设（m=5），K_f 偏差近 1.5 倍。用标准 FHA 公式 + 设计书 §3.2 取值 m=7.4（Lm=2.0mH，LCR 实测一致）核对后：<strong>fn=1 处增益曲线斜率 dM/dfn = -2/m，与负载 Q 无关</strong>，所以 K_f 恒为 <strong>-0.505 V/kHz</strong>。真正随负载变的是<strong>输出极点</strong>：轻载时 Rload 变大，fp_out = 1/(2π·Rload·Co) 左移（50% → 10Hz）。极点左移让低频增益变平、fco 下移，PM 反而更高（50% 负载 PM 84.8°，25% 负载 85.9°）。<strong>结论反过来了：负载越轻，环路越稳</strong>——"一个增益发四个负载都稳"这件事比原来想的更省心。</p>
 
       <h3>8.3 为什么穿越频率敢设在 2kHz 而不是 20kHz？</h3>
       <p>三个理由：① 离开关频率 107kHz 有 50 倍远，环路"看平均不看纹波"，模型里的谐振极点影响可忽略（只有 12°）；② 2kHz 已远高于输出极点 19.9Hz，动态足够快；③ 再快就要跟开关纹波和采样噪声较劲，还会逼近采样保持 + 一拍延迟带来的相位损失上限。</p>
@@ -338,7 +338,7 @@ HRTIM1->sTimerxRegs[HRTIM_TIMERID_TIMER_D].CR2 |= HRTIM_CR2_SWU;
       <p>设计是按<strong>每开关周期控制</strong>做的（Ts = 9.35µs）。如果采样要 60µs（现在的 640 周期采样），一个控制周期都做不完，等于把控制率降到 1/6，环路带宽大打折扣，还会引入额外延迟。<strong>实测前必须把 ADC 采样缩短到 ≤4.5µs</strong>。</p>
 
       <h3>8.5 为什么 Lm 必须实测？</h3>
-      <p>Lm 进 K_f 的公式（K_f ∝ -2/m，m=Lm/Lr），直接决定增益标定；还决定 M_max（升压能力）和 fm。设计最初按 Lm=5×Lr 假设，LCR 表实测原边电感 <strong>Lm=2mH</strong>（m=7.4）后，K_f 从 -0.748 修正为 -0.505 V/kHz（差 1.48 倍）——这就是本次全线改系数、改教程的根因。<strong>用 LCR 表量原边电感</strong>，改完重跑 <code class="inline">llc_loop_design.m</code>，系数自动更新。</p>
+      <p>Lm 进 K_f 的公式（K_f ∝ -2/m，m=Lm/Lr），直接决定增益标定；还决定 M_max（升压能力）和 fm。设计书 §3.2 取 k=Lm/Lr=<strong>7.4</strong>（Lm=2.0mH），早期脚本误设成 m=5（Lm=1.35mH）导致 K_f=-0.748 偏小 1.48 倍；按设计书改回 m=7.4 后 K_f=-0.505 V/kHz——这就是本次全线改系数、改教程的根因。<strong>变压器绕好后用 LCR 表量原边电感核对</strong>，改完重跑 <code class="inline">llc_loop_design.m</code>，系数自动更新。</p>
     </section>
 
     <!-- ================= 09 练习 ================= -->
@@ -354,8 +354,8 @@ HRTIM1->sTimerxRegs[HRTIM_TIMERID_TIMER_D].CR2 |= HRTIM_CR2_SWU;
 
       <details>
         <summary>Q2：满载 360V 输入时，为什么调频也救不回 ±200V？</summary>
-        <div class="ans">谐振腔增益有物理上限 M_max=1.005，而 360V 需要 1.111。</div>
-        <div class="expl">控制器把频率压到 fs_min 就到底了（低于 fn≈0.95 增益反而回落），剩下的缺口是谐振腔给不出来的——这是硬件极限，要改 Lm/Lr 或 Lr/Cr。</div>
+        <div class="ans">谐振腔增益有物理上限 M_max=1.034（频带内），而 360V 需要 1.111。</div>
+        <div class="expl">控制器把频率压到 fs_min 就到底了（fn=0.888 已是变频下限，M_max=1.034 封顶），剩下的缺口是谐振腔给不出来的——这是硬件极限，要改 Lm/Lr 或 Lr/Cr。</div>
       </details>
 
       <details>
