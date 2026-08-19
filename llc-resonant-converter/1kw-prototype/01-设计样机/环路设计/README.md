@@ -233,7 +233,7 @@ fs  = clamp(fr + w, 95k, 130k)
    `vmeas = (vp + |vn|)/2`，目标 200V。**采样时间已从 640 周期(60µs) 缩短到
    12.5 周期(~2.4µs)**，并在 HRTIM TimerD REP 周期中断内软件触发（周期边界、
    相位锁定），每开关周期 9.35µs 可闭环（见 §11 与
-   [`../../04-60V缩尺300W/scaled-low-voltage-test-plan.md`](../../04-60V缩尺300W/scaled-low-voltage-test-plan.md) §5）。
+   [`../../04-60V缩尺300W/README.md`](../../04-60V缩尺300W/README.md) §4.4）。
 2. **控制率**：在开关周期中断（HRTIM TimerD REP）里调用 `llc_ctrl_period_isr()`
    （每 9.35µs），不是 100ms 轮询。`llc_ctrl_update()` 实现 2p2z。
 3. **频率写入**：`llc_apply_frequency(fs)` 把 fs 换算成 HRTIM TimerD 周期寄存器
@@ -249,7 +249,7 @@ fs  = clamp(fr + w, 95k, 130k)
 
 4. **保护**：过流 > 3A 锁存（`g_llc_fault`），REP 中断里停止 TimerD 计数与输出。
 5. **上电时序**：输出以 130kHz（最低增益）起步 → 2s 窗口合母线 → 软启动
-   130k→107k 斜坡 → 切入闭环（见 ../../04-60V缩尺300W/scaled-low-voltage-test-plan.md §4）。
+   130k→107k 斜坡 → 切入闭环（见 ../../04-60V缩尺300W/README.md §4.2）。
 
 ---
 
@@ -299,8 +299,6 @@ PLECS 复验。
 > fr 实测 ~105kHz（设计 107k）、死区实测驱动板 250ns 硬件死区 + HRTIM 59ns
 > （hrtim.c:79-82）→ 全桥占空丢失 ~7-13%。这些参数会改变 K_f 与升压裕量，
 > **改腔/调参前重跑 `llc_loop_design.m`**。
-> 60V 缩尺设计（60V 专用腔）、FHA 理论、时域仿真与测试计划已移到
-> [`../../04-60V缩尺300W/`](../../04-60V缩尺300W/)（llc_theory.m / llc_rescale.m /
-> llc_sim.m / scaled-low-voltage-test-plan.md）。
-> 60V 缩尺腔压降根因定论（副边增益健康、整流管 RHRP860 VF）与改腔说明见
-> [`../工程开发文档.md`](../工程开发文档.md) §0、[`../../04-60V缩尺300W/README.md`](../../04-60V缩尺300W/README.md) §11。
+> 60V/300W 缩尺样机完整文档（实际器件参数、工程日志、测试方案与闭环固件）见
+> [`../../04-60V缩尺300W/README.md`](../../04-60V缩尺300W/README.md)。
+> 60V 缩尺腔压降根因定论（副边增益健康、整流管 RHRP860 VF，换 MBR10100）见该文档 §3。
