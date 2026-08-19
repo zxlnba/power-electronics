@@ -45,11 +45,14 @@ for i=1:size(loads,1)
   fprintf('%-22s %6.0f %6.2f %8.0f %7.2f\n', loads{i,2}, R, R2Q(R), 60^2/R, 0.8106*R);
 end
 
-%% ============ 图1：不同 k（励磁比）增益曲线 —— 选取 Lm ============
+%% ============ 增益曲线（一张图两面板）：左=不同 k 比对选取 Lm，右=各带载 ============
 fs = (60:0.5:115)*1e3;  fn = fs/fr;
 ks  = [2.5 3.0 3.2 3.5 4.0 5.0];       % k = Lm/Lr 候选
 cols = [0.55 0.65 0.75; 0.35 0.55 0.70; 0.85 0.15 0.1; 0.9 0.6 0.0; 0.6 0.25 0.7; 0.4 0.4 0.4];
-figure('Color','w','Position',[60 60 900 520]); hold on;
+figure('Color','w','Position',[40 60 1400 540]);
+
+%% 左面板：不同 k 增益曲线 —— 选取 Lm（满载 12Ω）
+subplot(1,2,1); hold on;
 for i=1:numel(ks)
   lam_i = 1/ks(i);
   if ks(i)==3.2   % 选定的 Lm=26µH（PQ35 气隙 0.32mm）
@@ -62,12 +65,11 @@ xline(fr/1e3,'k--','fr(计算)≈81k'); xline(75,'k:','fr(实测)≈75k'); yline
 xlabel('fs [kHz]'); ylabel('M'); ylim([0 1.5]);
 legend({'k=2.5 (Lm≈20µH)','k=3.0 (Lm≈25µH)','k=3.2 (Lm≈26µH) 选定','k=3.5 (Lm≈29µH)','k=4.0 (Lm≈33µH)','k=5.0 (Lm≈41µH)'},'Location','best');
 title('满载 12Ω：不同 k=Lm/Lr 增益曲线（选取 Lm）');
-saveas(gcf, 'k_sweep_select_Lm.png');
 
-%% ============ 图2：各带载增益曲线（选定 k=3.2, Lm=26µH） ============
+%% 右面板：各带载增益曲线（选定 k=3.2, Lm=26µH）
 loads_c = [12 15 20 30 40 46];
 lg = {'满载 12Ω','15Ω','20Ω','30Ω','40Ω (验证)','46Ω','实测工作点'};
-figure('Color','w','Position',[60 60 900 520]); hold on;
+subplot(1,2,2); hold on;
 for i=1:numel(loads_c)
   R = loads_c(i);
   if R==12            % 满载：加粗实线
@@ -83,7 +85,8 @@ plot([75 80 100], [1.0 1.0 0.85], 'ko', 'MarkerFaceColor','k', 'MarkerSize', 7);
 xline(fr/1e3,'k--','fr(计算)≈81k'); xline(75,'k:','fr(实测)≈75k'); yline(1,'k:','M=1'); grid on;
 xlabel('fs [kHz]'); ylabel('M'); ylim([0 1.5]);
 legend(lg, 'Location','best');
-title('60V/300W 缩尺腔 (Lr=8.2µH/Cr=470nF/Lm=26µH, k=3.2) 各带载增益曲线');
+title('各带载增益曲线 (k=3.2, Lm=26µH)');
+
 saveas(gcf, 'LLC_gain_curves_Lm26uH.png');
 
 %% ============ 满载增益 vs fs（看调压范围） ============

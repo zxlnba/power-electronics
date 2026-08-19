@@ -69,8 +69,7 @@
 └── 04-60V缩尺300W/                    ← ④ 1kW 缩尺成 60V/300W
     ├── README.md                      ← ★ 60V 缩尺样机文档（实际参数/设计基础/工程日志/测试方案与闭环固件）
     ├── llc_rescale.m                  ← 谐振腔参数校核与增益计算
-    ├── k_sweep_select_Lm.png          ← 不同 k 增益比对（选取 Lm）
-    ├── LLC_gain_curves_Lm26uH.png     ← 各带载增益曲线（含实测工作点）
+    ├── LLC_gain_curves_Lm26uH.png     ← 增益曲线（左 k 比对选 Lm / 右各带载）
     ├── llc_rescale_60v300w.png        ← 原设计参数增益曲线
     ├── llc_theory.m / llc_sim.m       ← 1kW 现腔接 60V 分析（历史）
     ├── scaled-low-voltage-test-plan.md ← 60V 缩尺测试方案与闭环固件
