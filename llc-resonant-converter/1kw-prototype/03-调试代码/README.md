@@ -91,8 +91,8 @@ CubeMX 生成的 PLL + 同步时钟配置导致 ADRDY 不置位，HAL 1ms 超时
 
 > 实际 Keil 工程在 `D:\桌面\超级档案\voltage_sampling`（含 CubeMX 全套外设
 > hrtim.c / stm32g4xx_it.c / OLED.c 等）。本目录是固件源文件镜像，供仓库引用与
-> 版本管理。闭环固件测试方案详见
-> [`../04-60V缩尺300W/scaled-low-voltage-test-plan.md`](../04-60V缩尺300W/scaled-low-voltage-test-plan.md)。
+> 版本管理。闭环固件测试方案与上电时序详见
+> [`../04-60V缩尺300W/README.md`](../04-60V缩尺300W/README.md) §4。
 
 ## 调试与验证
 
