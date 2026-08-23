@@ -181,7 +181,7 @@ static uint16_t adc_block_read_avg(uint32_t nsamp, uint16_t *spread)
   return (uint16_t)((sum - mn - mx) / (nsamp - 2));
 }
 
-/* 零点=固定标定 VCM（用户定 VS_VCM_DEF=1.627V），读数直接减它。
+/* 零点=固定标定 VCM（VS_VCM_DEF=1.627V），读数直接减它。
    抓取的 PA0/PA1 计数仅作平滑起步（0.5ms 自收敛）与诊断显示（B=），不作零点。
    平滑为纯指数低通（无突变拒绝，防锁死）；异常抓取值回退名义值。 */
 static void adc_capture_baseline(void)
@@ -344,7 +344,7 @@ void llc_ctrl_period_isr(void)
      主循环读会被 REP 抢占→OVR→EOC 丢失，故必须 ISR 内采样。 */
   adc1_sample_isr();
 
-  /* 电压换算（VREFINT 归一化 + 0V 慢速校零零点，2026-08-10 定论改版）：
+  /* 电压换算（VREFINT 归一化 + 0V 慢速校零零点，2026-08-10 改版）：
      VADC = counts × g_vref/4096，g_vref = 3.0×VREFINT_CAL/VREFINT_counts
      —— 精确跟踪 VDDA：出厂标定与实测同载 VREFINT，ratio 抵消 ±1% 容差，
         参考漂移/抖动自动消除（实测：固定参考在 VDDA 抖 ±0.3% 时读数跳 0.8V，归一化后根除）。
