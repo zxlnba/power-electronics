@@ -11,15 +11,22 @@ power-electronics/
     └── 1kw-prototype/        ← 原理图 / PCB / 固件 / 环路设计 / 调试验证
 ```
 
-## 📌 最新进展（2026-08-11）
+## 📌 最新进展（2026-08-25）
 
-1kW LLC 样机完成 60V 低压测试，**发现谐振腔设计点与 60V 负载不匹配**（现腔 Z0=181.5Ω
-按额定 400V/1kW Q=1.4 设计，60V 可用负载换算 Q=2~8 → 增益封顶 M≈1.0 无升压区，实测
-M≈0.8）。已给出**改腔方案（Z0=52.2）**并整理成完整工程开发文档：
+1kW 原理样机完成 **60V/300W 缩尺腔**验证与损耗排查：
 
-- **完整工程记录**：[`llc-resonant-converter/1kw-prototype/docs/工程开发文档.md`](./llc-resonant-converter/1kw-prototype/docs/工程开发文档.md)
-- **调试日志**：[`llc-resonant-converter/1kw-prototype/docs/调试日志/`](./llc-resonant-converter/1kw-prototype/docs/调试日志/)
-- 教训：任何缩尺/改点测试，先算目标负载 Q、查该 Q 下增益曲线与损耗预算，再定目标电压/功率。
+- **缩尺腔（方案A 落地）**：Lr=8.2µH、Cr=470nF、Lm=26µH（PQ35 1:1、6T），实测
+  fr≈75kHz 增益=1（感性区 ZVS），副边整流前方波增益健康；
+- **压降/损耗根因定位**：除副边整流管 VF（RHRP860 → MBR10100 更换）外，进一步定位到
+  原边开通叠区（开通电阻 20Ω→10Ω 后效率 90%+）与循环电流 I²R；
+- **闭环固件**：2p2z 数字电压环 + 软启动 + 过流保护已落地；采样时序由 640 周期缩短到
+  12.5 周期，并在 HRTIM 周期边界相位锁定。
+
+- **完整工程记录**：[`1kw-prototype/01-设计样机/工程开发文档.md`](./llc-resonant-converter/1kw-prototype/01-设计样机/工程开发文档.md)
+- **调试日志**：[`1kw-prototype/03-调试代码/调试日志/`](./llc-resonant-converter/1kw-prototype/03-调试代码/调试日志/)
+- **60V 缩尺样机文档**：[`1kw-prototype/04-60V缩尺300W/README.md`](./llc-resonant-converter/1kw-prototype/04-60V缩尺300W/README.md)
+
+教训：任何缩尺/改点测试，先算目标负载 Q、查该 Q 下增益曲线与损耗预算，再定目标电压/功率。
 
 ## 项目
 

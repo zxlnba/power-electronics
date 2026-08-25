@@ -95,7 +95,8 @@ void    llc_ctrl_set_vref(llc_ctrl_t *c, float v);
 void    llc_ctrl_set_gain_scale(llc_ctrl_t *c, float k);
 void    llc_ctrl_set_fixed_fs(llc_ctrl_t *c, float fs);  /* 开环固定频率（扫描） */
 void    llc_ctrl_start(llc_ctrl_t *c);                    /* 进入软启动（清除故障） */
-float   llc_ctrl_update(llc_ctrl_t *c, float vmeas);      /* 2p2z 一步 */
+float   llc_ctrl_update(llc_ctrl_t *c, float vmeas);      /* 2p2z 一步（撞钳位冻结 x1/x2 抗饱和） */
+void    llc_ctrl_fault_latch(void);                        /* 过流锁存 + 立即停功率级（main 调用） */
 uint32_t llc_apply_frequency(float fs);                   /* fs -> PERxR/CMP1xR */
 void    llc_ctrl_period_isr(void);                        /* 每开关周期调用（REP 中断） */
 

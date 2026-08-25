@@ -8,6 +8,7 @@
   *       x1  = b1*e - a1*w + x2
   *       x2  = b2*e - a2*w
   *       fs  = clamp( fs_nom + w, fs_min, fs_max )
+  *   抗饱和：撞钳位（fs 越界）时冻结 x1/x2，防积分饱和回冲（见 llc_ctrl_update）。
   *   极性：fs↑ -> Vout↓（K_f<0），err>0（电压偏低）-> w<0 -> fs 下降 -> 升压。
   *
   *   状态机：OPENLOOP（等待/扫描）→ SOFTSTART（130k 斜坡到 107k）→ CLOSED（2p2z），
@@ -218,6 +219,22 @@ static void llc_stop_outputs(void)
   HAL_HRTIM_WaveformOutputStop(&hhrtim1, HRTIM_OUTPUT_TD2);
 }
 
+/* 过流故障锁存并立即停功率级。
+   ⚠️ main 主循环的过流判定必须走这里，不能只置 g_llc_fault：OLED 刷新会
+   用 NVIC_DisableIRQ 屏蔽 REP 中断（保护软件 I2C 位时序，约 500ms 一次、
+   每次 ~1ms），若只置位等 ISR 动作，过流停机会被拖到 OLED 刷新窗口之后；
+   本函数直接锁存 + 停输出，把过流最坏响应收紧到 ≤100ms 轮询周期。
+   REP 中断内的 g_llc_fault 判据保留作后备（其它路径置位时仍会动作）。 */
+void llc_ctrl_fault_latch(void)
+{
+  llc_ctrl_t *c = &g_ctrl;
+  c->enable = false;
+  c->state  = LLC_STATE_FAULT;
+  g_llc_state = LLC_STATE_FAULT;
+  g_llc_fault = true;
+  llc_stop_outputs();
+}
+
 void llc_ctrl_init(llc_ctrl_t *c)
 {
   c->b0 = LC_B0 * LC_K_GAIN_SCALE;   /* 低压测试增益补偿；额定 400V 时 LC_K_GAIN_SCALE=1 */
@@ -301,17 +318,27 @@ void llc_ctrl_start(llc_ctrl_t *c)
   g_llc_fs_cmd    = c->fs_cmd;
 }
 
-/* 2p2z 一步。vmeas = (vp + |vn|)/2，目标 c->vref。返回已钳位 fs_cmd。 */
+/* 2p2z 一步。vmeas = (vp + |vn|)/2，目标 c->vref。返回已钳位 fs_cmd。
+   抗饱和：撞钳位（fs 越界）时冻结内部状态 x1/x2——频率被限在
+   fs_min/fs_max 时状态不再累积，误差一转向立即恢复，防积分饱和回冲
+   （与 60V 闭环固件"撞钳位冻结积分"同基线）。 */
 float llc_ctrl_update(llc_ctrl_t *c, float vmeas)
 {
   float w, e, fs;
 
   e = c->vref - vmeas;
   w  = c->b0*e + c->x1;
-  c->x1 = c->b1*e - c->a1*w + c->x2;
-  c->x2 = c->b2*e - c->a2*w;
-  c->fs_raw = c->fs_nom + w;
-  fs = fclamp(c->fs_raw, c->fs_min, c->fs_max);
+  fs = c->fs_nom + w;
+  if (fs > c->fs_max || fs < c->fs_min)
+  {
+    fs = fclamp(fs, c->fs_min, c->fs_max);   /* 撞钳位：只钳位 fs，冻结 x1/x2 */
+  }
+  else
+  {
+    c->x1 = c->b1*e - c->a1*w + c->x2;
+    c->x2 = c->b2*e - c->a2*w;
+  }
+  c->fs_raw = fs;
   c->fs_cmd = fs;
   return fs;
 }

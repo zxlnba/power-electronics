@@ -250,12 +250,16 @@
       </div>
       <p>代入 C(s) 展开，得到 <strong>2p2z</strong>（两个零点两个极点）的标准形式，最后变成三行差分方程（直接 II 型）：</p>
 <pre><code>// 每开关周期调用一次。err = vref − vmeas
-w  = b0*err + x1;         // w = 本拍修正量
-x1 = b1*err - a1*w + x2;  // x1, x2 是环路的"记忆"
-x2 = b2*err - a2*w;
-fs = clamp(fr + w, 95k, 130k);   // 频率指令，带回钳位
+w  = b0*err + x1;              // w = 本拍修正量
+fs = fr + w;
+if (fs &gt; 130k || fs &lt; 95k) {
+    fs = clamp(fs, 95k, 130k); // 撞钳位：冻结 x1/x2（抗饱和，防回冲）
+} else {
+    x1 = b1*err - a1*w + x2;   // x1, x2 是环路的"记忆"
+    x2 = b2*err - a2*w;
+}
 </code></pre>
-      <p><code class="inline">x1, x2</code> 存的是历史误差与输出的加权记忆——它们让"积分"存在（这就是上一课那个积分在数字世界的落地）。<strong>clamp</strong> 是硬限制：95–130kHz，防止频率出界，也防止积分越积越大（抗饱和）。</p>
+      <p><code class="inline">x1, x2</code> 存的是历史误差与输出的加权记忆——它们让"积分"存在（这就是上一课那个积分在数字世界的落地）。<strong>clamp</strong> 是硬限制：95–130kHz，防止频率出界。注意<strong>撞钳位（fs 越界）时冻结 x1/x2 不更新</strong>——频率被限住时状态不再累积，防积分饱和后恢复时频率回冲；这就是抗饱和的落地（固件实现见 <code class="inline">llc_ctrl_update()</code>）。</p>
 
       <h3>6.3 系数怎么来</h3>
       <p>这套系数（b0…a2）不是你手算的，是 <code class="inline">llc_loop_design.m</code> 自动算出来的：设计 C(s) → Tustin 离散 → 提取系数 → 写进 <code class="inline">llc_ctrl.h</code>。你要改的是参数（Lm、Co），不是系数。</p>
@@ -309,10 +313,12 @@ fs = clamp(fr + w, 95k, 130k);   // 频率指令，带回钳位
       </ul>
 
       <h3>7.4 固件里的最后一公里</h3>
-      <p>控制器算出的 fs 要写进 HRTIM 的周期寄存器：</p>
+      <p>控制器算出的 fs 要写进 HRTIM 的周期寄存器。这里有两处容易踩的坑：TimerD 的寄存器组下标要用
+      <code class="inline">HRTIM_TIMERINDEX_TIMER_D</code>（用 MCR 掩码 <code class="inline">HRTIM_TIMERID_TIMER_D</code> 当数组下标会越界）；
+      同时补写 <code class="inline">CMP1xR</code> 保 50% 占空比（只写 PER 会丢占空比）；<code class="inline">HRTIM_CR2_SWU</code> 宏不存在，不要用。</p>
 <pre><code>PER = HRTIM_CLK / fs;            // 107kHz→1588, 95kHz→1789, 130kHz→1307
-HRTIM1->sTimerxRegs[HRTIM_TIMERID_TIMER_D].PERxR = PER;
-HRTIM1->sTimerxRegs[HRTIM_TIMERID_TIMER_D].CR2 |= HRTIM_CR2_SWU;
+HRTIM1-&gt;sTimerxRegs[HRTIM_TIMERINDEX_TIMER_D].PERxR  = per;
+HRTIM1-&gt;sTimerxRegs[HRTIM_TIMERINDEX_TIMER_D].CMP1xR = (per+1)&gt;&gt;1;  // 补写 CMP1，保 50% 占空比
 </code></pre>
       <div class="callout">
         <span class="t">✅ 最终体检表（离散域）</span>
@@ -334,8 +340,11 @@ HRTIM1->sTimerxRegs[HRTIM_TIMERID_TIMER_D].CR2 |= HRTIM_CR2_SWU;
       <h3>8.3 为什么穿越频率敢设在 2kHz 而不是 20kHz？</h3>
       <p>三个理由：① 离开关频率 107kHz 有 50 倍远，环路"看平均不看纹波"，模型里的谐振极点影响可忽略（只有 12°）；② 2kHz 已远高于输出极点 19.9Hz，动态足够快；③ 再快就要跟开关纹波和采样噪声较劲，还会逼近采样保持 + 一拍延迟带来的相位损失上限。</p>
 
-      <h3>8.4 为什么 ADC 采样必须快？</h3>
-      <p>设计是按<strong>每开关周期控制</strong>做的（Ts = 9.35µs）。如果采样要 60µs（现在的 640 周期采样），一个控制周期都做不完，等于把控制率降到 1/6，环路带宽大打折扣，还会引入额外延迟。<strong>实测前必须把 ADC 采样缩短到 ≤4.5µs</strong>。</p>
+      <h3>8.4 为什么 ADC 采样必须快？（调试中踩过的坑）</h3>
+      <p>设计是按<strong>每开关周期控制</strong>做的（Ts = 9.35µs）。初版固件把 ADC 采样时间设成 640 周期
+      （≈60µs，比一个开关周期还长），一个控制周期都做不完，等于把控制率降到 1/6，环路带宽大打折扣，
+      还会引入额外延迟。调试中已把采样缩短到 <strong>12.5 周期（~2.4µs）</strong>，并在 HRTIM 周期边界
+      软件触发、相位锁定，每开关周期内完成闭环。</p>
 
       <h3>8.5 为什么 Lm 必须实测？</h3>
       <p>Lm 进 K_f 的公式（K_f ∝ -2/m，m=Lm/Lr），直接决定增益标定；还决定 M_max（升压能力）和 fm。设计书 §3.2 取 k=Lm/Lr=<strong>7.4</strong>（Lm=2.0mH），早期脚本误设成 m=5（Lm=1.35mH）导致 K_f=-0.748 偏小 1.48 倍；按设计书改回 m=7.4 后 K_f=-0.505 V/kHz——这就是本次全线改系数、改教程的根因。<strong>变压器绕好后用 LCR 表量原边电感核对</strong>，改完重跑 <code class="inline">llc_loop_design.m</code>，系数自动更新。</p>

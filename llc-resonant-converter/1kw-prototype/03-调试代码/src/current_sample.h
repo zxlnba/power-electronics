@@ -5,7 +5,8 @@
 #include <stdbool.h>
 
 /* ============ 电流采样参数（TMCS1101A1 + 分压） ============ */
-#define CUR_ADC_VREF     3.3f     /* ADC 参考电压 = VDDA = 3.3V */
+#define CUR_ADC_VREF     3.3f     /* ADC 参考电压名义值（VDDA≈3.3V，兜底）；
+                                    实际换算用 VREFINT 归一化 g_vref_volts（见 cur_ampere） */
 #define CUR_ADC_BITS     4096.0f  /* 12 位 ADC */
 #define CUR_SENS_VPERA   0.050f   /* TMCS1101A1 灵敏度 50mV/A */
 #define CUR_SENS_VOS     2.5f     /* 零点输出 = 0.5 × 供电(5V) */

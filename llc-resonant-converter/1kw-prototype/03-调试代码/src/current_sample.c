@@ -7,11 +7,15 @@
   *            VOUT(传感器) = 0.5×VCC + 0.050×I   (VCC=5V → 零点2.5V)
   *            分压后 VADC = VOUT × 0.607         (5.1/(3.3+5.1))
   *            =>  I = (VADC/0.607 - 2.5) / 0.050
+  *
+  *          参考电压用 VREFINT 归一化 g_vref_volts（llc_ctrl.c 跟踪 VDDA，实测
+  *          ≈3.16V），不硬编码 3.3V——与电压通道同口径，抵消参考漂移/抖动。
   ******************************************************************************
   */
 #include "current_sample.h"
 
 extern ADC_HandleTypeDef hadc2;
+extern float g_vref_volts;   /* VREFINT 归一化参考（llc_ctrl.c 跟踪 VDDA），电流换算同电压通道 */
 
 volatile float    g_curr1 = 0.0f;
 volatile float    g_curr2 = 0.0f;
@@ -26,7 +30,7 @@ bool cur_init(void)
 /* counts -> 电流(A) */
 float cur_ampere(uint16_t counts)
 {
-    float vadc = (float)counts * CUR_ADC_VREF / CUR_ADC_BITS;
+    float vadc = (float)counts * g_vref_volts / CUR_ADC_BITS;   /* VREFINT 归一化参考 */
     float vout = vadc / CUR_DIV_RATIO;        /* 还原传感器输出 */
     return (vout - CUR_SENS_VOS) / CUR_SENS_VPERA;
 }
@@ -37,7 +41,7 @@ static bool cur_read_counts(uint16_t *r1, uint16_t *r2)
     if (HAL_ADC_Start(&hadc2) != HAL_OK)
     {
         /* 同电压采样：手动等 ADRDY 后重试 */
-        ADC1->ISR = ADC_ISR_ADRDY;
+        ADC2->ISR = ADC_ISR_ADRDY;   /* 原误清 ADC1（本路径是 hadc2），ADRDY 残留会致重试仍失败 */
         ADC2->CR |= ADC_CR_ADEN;
         uint32_t t0 = HAL_GetTick();
         while ((ADC2->ISR & ADC_ISR_ADRDY) == 0)

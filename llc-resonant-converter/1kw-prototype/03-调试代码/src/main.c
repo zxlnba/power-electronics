@@ -126,7 +126,11 @@ int main(void)
   {
     /* USER CODE BEGIN 3 */
     /* 电流采样（ADC2）+ 过流判定。
-       ⚠️ 电压(ADC1) 由 REP 周期中断独占，主循环不要再访问 ADC1。 */
+       ⚠️ 电压(ADC1) 由 REP 周期中断独占，主循环不要再访问 ADC1。
+       ⚠️ 过流必须走 llc_ctrl_fault_latch() 立即锁存 + 停功率级，不能只置
+       g_llc_fault 等 ISR 动作：OLED 刷新用 NVIC_DisableIRQ 屏蔽 REP 中断
+       （约 500ms 一次，每次 ~1ms），只置位会把过流停机拖到刷新窗口之后。
+       本路径保证最坏响应 ≤ 100ms 轮询周期。 */
     static uint32_t s_tick = 0;
     if (HAL_GetTick() - s_tick > 100)
     {
@@ -137,7 +141,7 @@ int main(void)
         g_curr1 = 0.9f * g_curr1 + 0.1f * i1;   /* 轻平滑 */
         g_curr2 = 0.9f * g_curr2 + 0.1f * i2;
         if (g_curr1 > LC_OC_THRESH_A || g_curr2 > LC_OC_THRESH_A)
-          g_llc_fault = true;                   /* 置位后由 ISR 停止功率级并锁存 */
+          llc_ctrl_fault_latch();               /* 立即锁存 + 停功率级（ISR 判据保留作后备） */
       }
     }
 
